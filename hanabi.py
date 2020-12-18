@@ -3,10 +3,8 @@ import logging
 import secrets
 import hashlib
 import hmac
-import json
-from abc import ABC
 from collections import defaultdict
-from itertools import chain
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import IntEnum, Enum, auto
 
@@ -14,12 +12,12 @@ from babel import Locale
 
 from flask import Flask, abort, request, jsonify, render_template
 from flask_babel import Babel, get_locale, format_timedelta
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy import UniqueConstraint, select, update
+from sqlalchemy import UniqueConstraint, update
 from flask_sqlalchemy import SQLAlchemy
 
+import random
+
 import config
-import hanabi_utils
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +25,7 @@ app = Flask(__name__, static_folder='static', static_url_path='/static')
 
 
 app.config.from_object(config)
+# FIXME this is bad mojo with multiple workers
 app.config['SECRET_KEY'] = server_key = secrets.token_bytes(32)
 db = SQLAlchemy(app)
 babel = Babel(app, default_domain='hanabi')
@@ -74,15 +73,28 @@ for err in (400, 403, 404, 409, 410, 501):
     app.register_error_handler(err, json_err_handler(err))
 
 
+@dataclass(frozen=True)
+class CardType:
+    colour: int
+    num_value: int
+
+
 class HanabiSession(db.Model):
     __tablename__ = 'hanabi_session'
 
     id = db.Column(db.Integer, primary_key=True)
+    # game settings
+    cards_in_hand = db.Column(db.Integer, nullable=False)
     created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     colours = db.Column(db.Integer, nullable=False, default=5)
+    post_action_time_limit = db.Column(
+        db.Integer, nullable=False,
+        default=app.config['POST_ACTION_TIME_LIMIT_SECONDS']
+    )
 
     # volatile data
     round_start = db.Column(db.DateTime, nullable=True)
+    players_present = db.Column(db.Integer, nullable=False, default=0)
     turn = db.Column(db.Integer, nullable=False, default=0)
     tokens_remaining = db.Column(
         db.Integer, nullable=False, default=app.config['TOKEN_COUNT']
@@ -97,6 +109,21 @@ class HanabiSession(db.Model):
     active_player_id = db.Column(
         db.Integer, db.ForeignKey('player.id', ondelete='cascade'),
         nullable=True,
+    )
+
+    # if the active player already performed an action, and we're waiting
+    # for them to end their turn
+    turn_action_performed = db.Column(db.DateTime, nullable=True)
+
+    # True if the currently active player needs to draw a card when
+    # their turn ends
+    need_draw = db.Column(db.Boolean, nullable=False, default=False)
+
+    # if this value is non-null, the game will stop when the selected player
+    # gets their next turn
+    stop_game_before = db.Column(
+        db.Integer, db.ForeignKey('player.id', ondelete='cascade'),
+        nullable=True
     )
 
     @classmethod
@@ -123,9 +150,6 @@ class Player(db.Model):
         db.Integer, db.ForeignKey('hanabi_session.id', ondelete='cascade'),
         nullable=False,
     )
-    session = db.relationship(
-        HanabiSession, backref=db.backref('players')
-    )
     name = db.Column(db.String(MAX_NAME_LENGTH), nullable=False)
 
     def __repr__(self):
@@ -147,9 +171,6 @@ class HeldCard(db.Model):
     player_id = db.Column(
         db.Integer, db.ForeignKey('player.id', ondelete='cascade'),
         nullable=False
-    )
-    player = db.relationship(
-        Player, backref=db.backref('cards')
     )
 
     colour = db.Column(db.Integer, nullable=False)
@@ -345,6 +366,170 @@ def session_state(session_id, pepper):
     pass  # TODO implement
 
 
+class GameStateError(ValueError):
+    """
+    Non-recoverable game state corruption
+    """
+    pass
+
+
+class ActionNotValidNow(ValueError):
+    """
+    Raised when user/server attempts to do something that's not
+    allowed and/or impossible at this point in the game.
+    """
+    pass
+
+
+def query_fireworks_status(session: HanabiSession, for_update=False):
+    fireworks = [0] * session.colour_count
+    fireworks_q = Fireworks.query.filter(
+        Fireworks.session_id == session.id
+    )
+    if for_update:
+        fireworks_q = fireworks_q.with_for_update()
+    fw: Fireworks
+    for fw in fireworks_q.all():
+        try:
+            fireworks[fw.colour] = fw.current_value
+        except IndexError as e:
+            raise GameStateError("Illegal colour value", e)
+
+    return fireworks
+
+
+def query_hands_for_others(session: HanabiSession, player: Player):
+    hands_q = HeldCard.query.filter(
+        HeldCard.session_id == session.id
+        and HeldCard.player_id != player.id
+    )
+    result = defaultdict(lambda: [None] * session.cards_in_hand)
+    card: HeldCard
+    for card in hands_q.all():
+        hand: list = result[card.player_id]
+        try:
+            hand[card.card_position] = card
+        except IndexError as e:
+            raise GameStateError("Illegal card position", e)
+
+    return result
+
+
+def query_hand_for_current_player(session: HanabiSession, player_id,
+                                  for_update=False):
+    hands_q = HeldCard.query.filter(HeldCard.player_id == player_id)
+    if for_update:
+        hands_q = hands_q.with_for_update()
+
+    hand = [None] * session.cards_in_hand
+    for card in hands_q.all():
+        try:
+            hand[card.card_position] = card
+        except IndexError as e:
+            raise GameStateError("Illegal card position", e)
+    return hand
+
+
+def query_deck_status(session: HanabiSession, for_update=False):
+    reserve_q = DeckReserve.query.filter(
+        DeckReserve.session_id == session.id
+    )
+    if for_update:
+        reserve_q = reserve_q.with_for_update()
+
+    deck = defaultdict(int)
+
+    total_left = 0
+    reserve: DeckReserve
+    for reserve in reserve_q.all():
+        count = max(reserve.cards_left, 0)
+        total_left += count
+        deck[CardType(reserve.colour, reserve.num_value)] = count
+
+    return total_left, deck
+
+
+def draw_card(session: HanabiSession, player_id):
+    total_left, deck = query_deck_status(session, for_update=True)
+
+    if not total_left:
+        raise ActionNotValidNow("No cards left to draw")
+
+    cur_hand = query_hand_for_current_player(session, player_id, for_update=True)
+
+    for pos, card in enumerate(cur_hand):
+        if card is None:
+            break
+    else:
+        raise ActionNotValidNow("No free slots in hand")
+
+    selected_ix = random.randint(0, total_left - 1)
+    cur_ix = 0
+    card_type: CardType
+    for card_type, cards_left in deck.items():
+        next_ix = cur_ix + cards_left
+        if selected_ix < next_ix:
+            break
+    else:
+        raise GameStateError("Failed to draw card")
+
+    deck_update_q = update(DeckReserve).values(
+        {'cards_left': DeckReserve.cards_left - 1}
+    ).where(
+        DeckReserve.session_id == session.id
+        and DeckReserve.colour == card_type.colour
+        and DeckReserve.num_value == card_type.num_value
+    )
+
+    drawn_card = HeldCard(
+        session_id=session.id, player_id=player_id,
+        colour=card_type.colour, num_value=card_type.num_value,
+        card_position=pos
+    )
+
+    db.session.execute(deck_update_q)
+    db.session.add(drawn_card)
+
+    return total_left - 1
+
+
+def end_turn(session: HanabiSession):
+    # invoked when the end-of-turn timer is triggered, or
+    # through the end-of-turn endpoint
+
+    if not session.turn_action_performed:
+        raise ActionNotValidNow(
+            "The player needs to perform an action first"
+        )
+
+    player = Player.query.get(session.active_player_id)
+    if session.need_draw:
+        try:
+            total_left = draw_card(session, player.id)
+
+            # no cards left in the deck --> final round time
+            if not total_left:
+                session.stop_game_before = player.id
+        except ActionNotValidNow:
+            # no cards left in the deck, that's OK
+            pass
+
+    # go to the next player
+    next_player_pos = (player.position + 1) % session.players_present
+    next_player = Player.query.filter(
+        Player.session_id == session.id
+        and Player.position == next_player_pos
+    ).one()
+
+    # reset stuff for next round
+    session.need_draw = False
+    session.turn_action_performed = None
+    session.active_player_id = next_player.id
+    session.turn = HanabiSession.turn + 1
+
+    db.session.commit()
+
+
 @app.route(mgmt_url, methods=['GET', 'POST', 'DELETE'])
 def manage_session(session_id, pepper, mgmt_token):
     check_mgmt_token(session_id, pepper, mgmt_token)
@@ -421,7 +606,6 @@ def play(session_id, pepper, player_id, player_token):
     round_start = sess.round_start
     if round_start is None:
         return abort(409, description="Round not started")
-
 
 
     return jsonify({}), 201
