@@ -9,7 +9,7 @@ import hanabi
 @pytest.fixture
 def client():
     hanabi.app.config['TESTING'] = True
-    hanabi.app.config['TESTING_SEED'] = 5
+    hanabi.app.config['TESTING_SEED'] = "abcdefg"
     hanabi.app.config['SERVER_NAME'] = 'localhost.localdomain'
 
     with hanabi.app.test_client() as client:
@@ -114,3 +114,38 @@ def test_create_destroy_session(client):
     assert response.status_code == 410, response.get_json()
     response = client.get(sess.manage_url)
     assert response.status_code == 410, response.get_json()
+
+
+def test_create_join(client):
+    sess = create_session(client)
+    gc1 = create_player_in_session(client, sess, name='tester1')
+
+    response = client.get(sess.manage_url)
+    rdata = response.get_json()
+    assert len(rdata['players']) == 1, rdata['players']
+    assert rdata['status'] == hanabi.Status.INITIAL
+
+    # we shouldn't be able to start a game yet
+    response = client.post(sess.manage_url)
+    assert response.status_code == 409, response.get_json()
+
+    gc2 = create_player_in_session(client, sess, name='tester2')
+    response = client.get(sess.manage_url)
+    rdata = response.get_json()
+    assert len(rdata['players']) == 2, rdata['players']
+
+    response = client.post(sess.manage_url)
+    assert response.status_code == 200, response.get_json()
+
+    # check if we can query the game state
+    response = client.get(gc1.play_url)
+    assert response.status_code == 200, response.get_json()
+    rdata = response.get_json()
+    status = rdata['status']
+    assert status == hanabi.Status.PLAYER_THINKING, status
+    for pdata in rdata['players']:
+        if pdata['player_id'] == gc1.player_id:
+            assert 'hand' not in pdata
+        else:
+            hand = pdata['hand']
+            assert None not in hand, hand

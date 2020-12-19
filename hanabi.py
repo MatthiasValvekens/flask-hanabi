@@ -6,7 +6,7 @@ import hmac
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional, Dict
 
 from babel import Locale
 
@@ -83,6 +83,11 @@ class CardType:
     colour: int
     num_value: int
 
+    def as_json(self):
+        return {
+            'colour': self.colour, 'num_value': self.num_value
+        }
+
 
 class HanabiSession(db.Model):
     __tablename__ = 'hanabi_session'
@@ -127,7 +132,7 @@ class HanabiSession(db.Model):
     stop_game_after = db.Column(
         db.Integer, db.ForeignKey(
             'player.id', ondelete='cascade', use_alter=True
-        ), nullable=True, use_alter=True
+        ), nullable=True
     )
 
     final_score = db.Column(db.Integer, nullable=True)
@@ -415,7 +420,7 @@ def session_state(session_id: int, calling_player: int = None):
 
     players = Player.query.filter(Player.session_id == session_id)
     player_json_objects = {
-        p.id: {'player_id': p.id, 'name': p.name}
+        p.id: {'player_id': p.id, 'name': p.name, 'position': p.position}
         for p in players
     }
     response = {
@@ -447,7 +452,10 @@ def session_state(session_id: int, calling_player: int = None):
         for player_id, player_json in player_json_objects.items():
             if player_id == calling_player:
                 continue
-            player_json['hand'] = hands[player_id]
+            player_json['hand'] = [
+                card.get_type().as_json() if card is not None else None
+                for card in hands[player_id]
+            ]
 
         # ... and regenerate the corresponding response entry
         response['players'] = list(player_json_objects.values())
@@ -495,7 +503,8 @@ def query_fireworks_status(session: HanabiSession, for_update=False) \
     return fireworks
 
 
-def query_hands_for_others(session: HanabiSession, player_id: int):
+def query_hands_for_others(session: HanabiSession, player_id: int)\
+        -> Dict[int, List[Optional[HeldCard]]]:
     hands_q = HeldCard.query.filter(
         HeldCard.session_id == session.id
         and HeldCard.player_id != player_id
@@ -509,7 +518,7 @@ def query_hands_for_others(session: HanabiSession, player_id: int):
         except IndexError as e:
             raise GameStateError("Illegal card position", e)
 
-    return result
+    return dict(result)
 
 
 def query_hand_for_current_player(session: HanabiSession, player_id,
@@ -558,6 +567,7 @@ class Deck:
             next_ix = cur_ix + cards_left
             if selected_ix < next_ix:
                 break
+            cur_ix = next_ix
         else:
             raise GameStateError("Failed to draw card")
 
@@ -871,9 +881,15 @@ def init_session(session: HanabiSession, pepper):
         for ix, count in enumerate(CARD_DIST_PER_COLOUR)
     )
 
-    player_ids = select(Player.id).filter(
+    player_id_q = db.session.query(Player.id).filter(
         Player.session_id == session.id
-    ).order_by(Player.position).all()
+    ).order_by(Player.position)
+    player_ids = list(pid for pid, in player_id_q)
+
+    if len(player_ids) < 2:
+        raise GameStateError("Too few players found")
+
+    session.active_player_id = player_ids[0]
 
     # draw all hand cards
     def _hands_gen():
@@ -965,7 +981,7 @@ def session_join(session_id, pepper, inv_token):
 
     sess: HanabiSession = HanabiSession.for_update(session_id)
 
-    if sess.game_running or sess.players_present <= MAX_PLAYERS:
+    if sess.game_running or sess.players_present > MAX_PLAYERS:
         return abort(409, description="This session is not accepting players.")
 
     submission_json = request.get_json()
@@ -976,13 +992,15 @@ def session_join(session_id, pepper, inv_token):
     except KeyError:
         return abort(400, description="'Name' is required")
 
-    p = Player(name=name)
-    sess.players.append(p)
+    position = sess.players_present
+    p = Player(name=name, session_id=session_id, position=position)
+    db.session.add(p)
     sess.players_present += 1
     db.session.commit()
     return {
         'player_id': p.id,
         'player_token': gen_player_token(session_id, p.id, pepper),
+        'position': position,
         'name': name
     }, 201
 
@@ -1069,7 +1087,7 @@ def discarded(session_id, pepper, player_id, player_token):
         .filter(HanabiSession.id == session_id).one_or_none()
     if sess is None:
         return abort(410, "Session has ended")
-    if sess.active_player_id is None:
+    if not sess.game_running:
         return abort(409, "Game is currently not running")
 
     discarded_cards = select([ActionLog.colour, ActionLog.num_value]).where(
