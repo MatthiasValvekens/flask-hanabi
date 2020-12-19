@@ -89,7 +89,7 @@ class HanabiSession(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     # game settings
-    cards_in_hand = db.Column(db.Integer, nullable=False)
+    cards_in_hand = db.Column(db.Integer, nullable=True)
     created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     post_action_time_limit = db.Column(
         db.Integer, nullable=False,
@@ -111,8 +111,9 @@ class HanabiSession(db.Model):
     )
 
     active_player_id = db.Column(
-        db.Integer, db.ForeignKey('player.id', ondelete='cascade'),
-        nullable=True,
+        db.Integer, db.ForeignKey(
+            'player.id', ondelete='cascade', use_alter=True
+        ), nullable=True
     )
 
     # if the active player already performed an action, and we're waiting
@@ -126,8 +127,9 @@ class HanabiSession(db.Model):
     # if this value is non-null, the game will stop when the selected player
     # gets their next turn
     stop_game_after = db.Column(
-        db.Integer, db.ForeignKey('player.id', ondelete='cascade'),
-        nullable=True
+        db.Integer, db.ForeignKey(
+            'player.id', ondelete='cascade', use_alter=True
+        ), nullable=True, use_alter=True
     )
 
     final_score = db.Column(db.Integer, nullable=True)
@@ -142,7 +144,7 @@ class HanabiSession(db.Model):
         return result
 
     def current_seed(self, pepper):
-        if app.config['TESTING']:
+        if app.config.get('TESTING', False):
             seed_suffix = app.config['TESTING_SEED']
         else:
             seed_suffix = pepper + app.config['SECRET_KEY'].hex()
@@ -180,9 +182,6 @@ class Player(db.Model):
 
 class HeldCard(db.Model):
     __tablename__ = 'held_card'
-    __table_args__ = (
-        UniqueConstraint('player_id', 'card_position'),
-    )
 
     # denormalised for easy access ("get hands of all players except me")
     session_id = db.Column(
@@ -192,14 +191,14 @@ class HeldCard(db.Model):
 
     player_id = db.Column(
         db.Integer, db.ForeignKey('player.id', ondelete='cascade'),
-        nullable=False
+        primary_key=True
     )
 
     colour = db.Column(db.Integer, nullable=False)
     num_value = db.Column(db.Integer, nullable=False)
 
     # 0-indexed position in the player's hand
-    card_position = db.Column(db.Integer, nullable=False)
+    card_position = db.Column(db.Integer, primary_key=True)
 
     def get_type(self):
         return CardType(self.colour, self.num_value)
@@ -212,15 +211,12 @@ class HeldCard(db.Model):
 
 class Fireworks(db.Model):
     __tablename__ = 'fireworks'
-    __table_args__ = (
-        UniqueConstraint('session_id', 'colour')
-    )
 
     session_id = db.Column(
         db.Integer, db.ForeignKey('hanabi_session.id', ondelete='cascade'),
-        nullable=False, index=True
+        index=True, primary_key=True
     )
-    colour = db.Column(db.Integer, nullable=False)
+    colour = db.Column(db.Integer, primary_key=True)
     current_value = db.Column(db.Integer, nullable=False, default=0)
 
     def __repr__(self):
@@ -232,15 +228,15 @@ class Fireworks(db.Model):
 class DeckReserve(db.Model):
     __tablename__ = 'deck_reserve'
     __table_args__ = (
-        UniqueConstraint('session_id', 'colour', 'num_value')
+        UniqueConstraint('session_id', 'colour', 'num_value'),
     )
 
     session_id = db.Column(
         db.Integer, db.ForeignKey('hanabi_session.id', ondelete='cascade'),
-        nullable=False, index=True
+        index=True, primary_key=True
     )
-    colour = db.Column(db.Integer, nullable=False)
-    num_value = db.Column(db.Integer, nullable=False)
+    colour = db.Column(db.Integer, primary_key=True)
+    num_value = db.Column(db.Integer, primary_key=True)
     cards_left = db.Column(db.Integer, nullable=False)
 
 
@@ -253,19 +249,13 @@ class ActionType(enum.Enum):
 class ActionLog(db.Model):
     __tablename__ = 'action_log'
 
-    __table_args__ = (
-        UniqueConstraint('session_id', 'turn')
-    )
-
     # again, denormalised for easy indexing
     session_id = db.Column(
         db.Integer, db.ForeignKey('hanabi_session.id', ondelete='cascade'),
-        nullable=False, index=True
+        index=True, primary_key=True
     )
 
-    # TODO just for fun, is there some kind of canonical way
-    #  to make sorting on a filtered column as efficient as possible?
-    turn = db.Column(db.Integer, nullable=False, index=True)
+    turn = db.Column(db.Integer, primary_key=True)
     action_type = db.Column(db.Enum(ActionType), nullable=False)
 
     player_id = db.Column(
@@ -416,10 +406,12 @@ class Status(enum.IntEnum):
     GAME_OVER = 4
 
 
-def session_state(session_id: int, calling_player: int):
+def session_state(session_id: int, calling_player: int = None):
 
     sess: HanabiSession = HanabiSession.query\
         .filter(HanabiSession.id == session_id).one_or_none()
+    if sess is None:
+        return abort(410, "Session has ended")
 
     players = Player.query.filter(Player.session_id == session_id)
     player_json_objects = {
@@ -452,15 +444,18 @@ def session_state(session_id: int, calling_player: int):
     # grab the status of the fireworks as they are now
     response['current_fireworks'] = query_fireworks_status(sess)
 
-    # tweak player json objects to include their hands
-    hands = query_hands_for_others(sess, calling_player)
-    for player_id, player_json in player_json_objects.items():
-        if player_id == calling_player:
-            continue
-        player_json['hand'] = hands[player_id]
+    # tweak player json objects to include their hands,
+    # unless called with calling_player None, which is the management API.
+    # The latter should only reveal the public parts of the game state
+    if calling_player is not None:
+        hands = query_hands_for_others(sess, calling_player)
+        for player_id, player_json in player_json_objects.items():
+            if player_id == calling_player:
+                continue
+            player_json['hand'] = hands[player_id]
 
-    # ... and regenerate the corresponding response entry
-    response['players'] = list(player_json_objects.values())
+        # ... and regenerate the corresponding response entry
+        response['players'] = list(player_json_objects.values())
 
     if sess.end_turn_at is None:
         response['status'] = Status.PLAYER_THINKING
@@ -920,6 +915,8 @@ def _eot_heartbeat_tasks(session_id, pepper):
 
     sess: HanabiSession = HanabiSession.query \
         .filter(HanabiSession.id == session_id).one_or_none()
+    if sess is None:
+        return
 
     now = datetime.utcnow()
     if sess.end_turn_at is None or sess.end_turn_at >= now:
@@ -936,11 +933,13 @@ def _eot_heartbeat_tasks(session_id, pepper):
     end_turn(sess, pepper)
 
 
-@app.route(mgmt_url, methods=['POST', 'DELETE'])
+@app.route(mgmt_url, methods=['GET', 'POST', 'DELETE'])
 def manage_session(session_id, pepper, mgmt_token):
     check_mgmt_token(session_id, pepper, mgmt_token)
-
-    if request.method == 'DELETE':
+    if request.method == 'GET':
+        _eot_heartbeat_tasks(session_id, pepper)
+        return session_state(session_id)
+    elif request.method == 'DELETE':
         HanabiSession.query.filter(HanabiSession.id == session_id).delete()
         db.session.commit()
         return jsonify({}), 200
@@ -958,8 +957,7 @@ def manage_session(session_id, pepper, mgmt_token):
                 'round_start': round_start.strftime(DATE_FORMAT_STR)
             }, 200
 
-        player_q = Player.query.filter(Player.session_id == session_id)
-        if db.session.query(player_q.count()).scalar() >= 2:
+        if sess.players_present < 2:
             return abort(409, "Cannot start game without at least two players")
 
         json_data = request.get_json()
