@@ -12,7 +12,7 @@ from babel import Locale
 
 from flask import Flask, abort, request, jsonify, render_template
 from flask_babel import Babel, get_locale, format_timedelta
-from sqlalchemy import UniqueConstraint, update, select, func
+from sqlalchemy import UniqueConstraint, update, select, func, desc
 from flask_sqlalchemy import SQLAlchemy
 
 import random
@@ -96,8 +96,6 @@ class HanabiSession(db.Model):
         default=app.config['POST_ACTION_TIME_LIMIT_SECONDS']
     )
 
-    # volatile data
-    round_start = db.Column(db.DateTime, nullable=True)
     players_present = db.Column(db.Integer, nullable=False, default=0)
     turn = db.Column(db.Integer, nullable=False, default=0)
     tokens_remaining = db.Column(
@@ -142,6 +140,10 @@ class HanabiSession(db.Model):
         if result is None and not allow_nonexistent:
             abort(410, description="Session has ended")
         return result
+
+    @property
+    def game_running(self) -> bool:
+        return self.active_player_id is not None
 
     def current_seed(self, pepper):
         if app.config.get('TESTING', False):
@@ -394,16 +396,14 @@ def check_player_token(session_id, pepper, player_id, player_token):
 
 
 class Status(enum.IntEnum):
-    # waiting for start announcement
-    INITIAL = 0
     # waiting for game to start
-    PRE_START = 1
+    INITIAL = 0
     # waiting for player action
-    PLAYER_THINKING = 2
+    PLAYER_THINKING = 1
     # waiting for turn to end
-    TURN_END = 3
+    TURN_END = 2
     # game scored
-    GAME_OVER = 4
+    GAME_OVER = 3
 
 
 def session_state(session_id: int, calling_player: int = None):
@@ -420,23 +420,18 @@ def session_state(session_id: int, calling_player: int = None):
     }
     response = {
         'created': sess.created,
-        'players': list(player_json_objects.values())
+        'players': list(player_json_objects.values()),
+        'colour_count': sess.colour_count
     }
-    round_start = sess.round_start
-    if round_start is None:
-        response['status'] = Status.INITIAL
-        return response
-
-    now = datetime.utcnow()
-    response['round_start'] = round_start.strftime(DATE_FORMAT_STR)
-    response['colour_count'] = sess.colour_count
-    if now < sess.round_start:
-        response['status'] = Status.PRE_START
-        return response
-    elif sess.final_score is not None:
-        response['status'] = Status.GAME_OVER
-        response['score'] = sess.final_score
-        return response
+    score = sess.final_score
+    if not sess.game_running:
+        if score is None:
+            response['status'] = Status.INITIAL
+            return response
+        else:
+            response['status'] = Status.GAME_OVER
+            response['score'] = sess.final_score
+            return response
 
     # if we're here, the game is actually running
 
@@ -645,7 +640,6 @@ def draw_card(session: HanabiSession, player_id, pepper):
 def stop_game(session: HanabiSession, score):
 
     session.active_player_id = None
-    session.round_start = None
     session.end_turn_at = None
     session.need_draw = False
     session.final_score = score
@@ -850,7 +844,7 @@ def give_hint(session: HanabiSession, target_player_id: int,
 
 
 def init_session(session: HanabiSession, pepper):
-    if session.round_start is not None:
+    if session.active_player_id is not None:
         # this (probably) points towards a select for update lock
         # doing its job.
         return
@@ -948,34 +942,21 @@ def manage_session(session_id, pepper, mgmt_token):
         # game initialisation logic
 
         sess: HanabiSession = HanabiSession.for_update(session_id)
-        round_start = sess.round_start
-        if round_start is not None:
+        if sess.game_running:
             # TODO provide a clean mechanism to stop the game and
             #  start a new one in the same session.
             # already initialised, nothing to do
-            return {
-                'round_start': round_start.strftime(DATE_FORMAT_STR)
-            }, 200
+            return jsonify({}), 200
 
         if sess.players_present < 2:
             return abort(409, "Cannot start game without at least two players")
 
-        json_data = request.get_json()
-        until_start = app.config['DEFAULT_COUNTDOWN_SECONDS']
-        if json_data is not None:
-            until_start = json_data.get('until_start', until_start)
-
         # initialise the session
         init_session(sess, pepper)
 
-        sess.round_start = round_start = \
-            datetime.utcnow() + timedelta(seconds=until_start)
-
         db.session.commit()
 
-        return {
-           'round_start': round_start.strftime(DATE_FORMAT_STR)
-        }, 200
+        return jsonify({}), 200
 
 
 @app.route(session_url_base + '/join/<inv_token>', methods=['POST'])
@@ -984,7 +965,7 @@ def session_join(session_id, pepper, inv_token):
 
     sess: HanabiSession = HanabiSession.for_update(session_id)
 
-    if sess.round_start is not None or sess.players_present <= MAX_PLAYERS:
+    if sess.game_running or sess.players_present <= MAX_PLAYERS:
         return abort(409, description="This session is not accepting players.")
 
     submission_json = request.get_json()
@@ -1010,8 +991,7 @@ def _ensure_active_player(session_id, player_id):
 
     sess = HanabiSession.for_update(session_id)
 
-    round_start = sess.round_start
-    if round_start is None:
+    if not sess.game_running:
         abort(409, description="Round not started")
 
     if sess.active_player_id != player_id:
@@ -1079,3 +1059,26 @@ def advance(session_id, pepper, player_id, player_token):
     sess = _ensure_active_player(session_id, player_id)
     end_turn(sess, pepper)
     return session_state(session_id, player_id)
+
+
+@app.route(play_url + '/discarded', methods=['GET'])
+def discarded(session_id, pepper, player_id, player_token):
+    check_player_token(session_id, pepper, player_id, player_token)
+
+    sess: HanabiSession = HanabiSession.query \
+        .filter(HanabiSession.id == session_id).one_or_none()
+    if sess is None:
+        return abort(410, "Session has ended")
+    if sess.active_player_id is None:
+        return abort(409, "Game is currently not running")
+
+    discarded_cards = select([ActionLog.colour, ActionLog.num_value]).where(
+        ActionLog.session_id == session_id
+        and ActionLog.action_type == ActionType.DISCARD
+    ).order_by(desc(ActionLog.turn))
+    return {
+        'discarded': [
+            {'colour': colour, 'num_value': num_value}
+            for colour, num_value in discarded_cards
+        ]
+    }
