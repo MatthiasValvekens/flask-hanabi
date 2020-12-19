@@ -6,14 +6,13 @@ import hmac
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import auto
 from typing import List
 
 from babel import Locale
 
 from flask import Flask, abort, request, jsonify, render_template
 from flask_babel import Babel, get_locale, format_timedelta
-from sqlalchemy import UniqueConstraint, update, select
+from sqlalchemy import UniqueConstraint, update, select, func
 from flask_sqlalchemy import SQLAlchemy
 
 import random
@@ -36,6 +35,7 @@ MAX_NAME_LENGTH = 250
 MAX_HINT_LENGTH = 50
 MAX_PLAYERS = 5
 CARD_DIST_PER_COLOUR = [3, 2, 2, 2, 1]
+MAX_NUM_VALUE = len(CARD_DIST_PER_COLOUR)
 
 
 def init_db():
@@ -130,7 +130,7 @@ class HanabiSession(db.Model):
         nullable=True
     )
 
-    final_score =db.Column(db.Integer, nullable=True)
+    final_score = db.Column(db.Integer, nullable=True)
 
     @classmethod
     def for_update(cls, session_id, *, allow_nonexistent=False) \
@@ -643,11 +643,17 @@ def draw_card(session: HanabiSession, player_id, pepper):
     return deck.total_left
 
 
-def stop_game(session: HanabiSession):
-    pass  # TODO implement
+def stop_game(session: HanabiSession, score):
+
+    session.active_player_id = None
+    session.round_start = None
+    session.end_turn_at = None
+    session.need_draw = False
+    session.final_score = score
+    db.session.commit()
 
 
-def end_turn(session: HanabiSession):
+def end_turn(session: HanabiSession, pepper):
     # invoked when the end-of-turn timer is triggered, or
     # through the end-of-turn endpoint
 
@@ -658,14 +664,26 @@ def end_turn(session: HanabiSession):
         #  -> no biggie, just bail
         return
 
-    if session.active_player_id == session.stop_game_after:
-        stop_game(session)
+    if not session.errors_remaining:
+        # too many mistakes -> insta-loss
+        stop_game(session, score=0)
+        return
+
+    # compute score
+    score = db.session.query(
+        func.sum(Fireworks.current_value)
+    ).where(Fireworks.session_id == session.id).scalar()
+    # check if the score is maxed out or if the last round is over
+    if score == session.colour_count * MAX_NUM_VALUE or \
+            session.active_player_id == session.stop_game_after:
+        # insta-win
+        stop_game(session, score=score)
         return
 
     player = Player.query.get(session.active_player_id)
     if session.need_draw:
         try:
-            total_left = draw_card(session, player.id)
+            total_left = draw_card(session, player.id, pepper)
 
             # no cards left in the deck --> final round time
             if not total_left:
@@ -748,12 +766,10 @@ def play_card(session: HanabiSession, pos: int):
     except NoResultFound:
         raise GameStateError("Fireworks not instantiated properly")
 
-    playable = fw.current_value == card_type.num_value + 1
+    playable = fw.current_value == card_type.num_value - 1
 
     if playable:
-        fw.current_value += 1
-    elif session.errors_remaining == 1:
-        stop_game(session)
+        fw.current_value = card_type.num_value
     else:
         session.errors_remaining -= 1
 
@@ -1021,12 +1037,12 @@ def action(session_id, pepper, player_id, player_token):
         else:
             play_card(sess, position)
 
-    return jsonify({}), 200
+    return session_state(session_id, player_id)
 
 
 @app.route(play_url + '/advance', methods=['POST'])
 def advance(session_id, pepper, player_id, player_token):
     check_player_token(session_id, pepper, player_id, player_token)
     sess = _ensure_active_player(session_id, player_id)
-    end_turn(sess)
-    return jsonify({}), 200
+    end_turn(sess, pepper)
+    return session_state(session_id, player_id)
