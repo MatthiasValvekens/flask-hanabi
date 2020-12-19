@@ -142,7 +142,11 @@ class HanabiSession(db.Model):
         return result
 
     def current_seed(self, pepper):
-        return str(self.turn) + pepper + app.config['SECRET_KEY'].hex()
+        if app.config['TESTING']:
+            seed_suffix = app.config['TESTING_SEED']
+        else:
+            seed_suffix = pepper + app.config['SECRET_KEY'].hex()
+        return str(self.turn) + seed_suffix
 
     def current_action(self) -> 'ActionLog':
         try:
@@ -462,7 +466,7 @@ def session_state(session_id: int, calling_player: int):
         response['status'] = Status.PLAYER_THINKING
     else:
         response['last_action'] = sess.current_action().as_json()
-        response['turn_ends_at'] = sess.end_turn_at.strftime(DATE_FORMAT_STR)
+        response['end_turn_at'] = sess.end_turn_at.strftime(DATE_FORMAT_STR)
         response['status'] = Status.TURN_END
 
     return response
@@ -902,6 +906,36 @@ def init_session(session: HanabiSession, pepper):
     )
 
 
+# update the DB if an end-of-turn timer is triggered
+def _eot_heartbeat_tasks(session_id, pepper):
+    # NOTE: this routine runs on GET requests as well!
+    # This is OK, since from the perspective of the client, the GET-request
+    #  still doesn't modify any state. If you want, this routine merely brings
+    #  the DB state in line with the "virtual" state of the session, which
+    #  exists independently of the request.
+
+    # first, query without special locks for better throughput
+    # (the vast majority of requests won't trigger an end-of-turn timer, and we
+    # don't want those to be stalled by locks)
+
+    sess: HanabiSession = HanabiSession.query \
+        .filter(HanabiSession.id == session_id).one_or_none()
+
+    now = datetime.utcnow()
+    if sess.end_turn_at is None or sess.end_turn_at >= now:
+        # nothing to do
+        return
+
+    # re-fetch with FOR UPDATE
+    sess = HanabiSession.for_update(session_id)
+    # re-check condition to prevent concurrency shenanigans
+    if sess.end_turn_at is None or sess.end_turn_at >= now:
+        return
+
+    # run the end_turn logic (which also commits the current transaction)
+    end_turn(sess, pepper)
+
+
 @app.route(mgmt_url, methods=['POST', 'DELETE'])
 def manage_session(session_id, pepper, mgmt_token):
     check_mgmt_token(session_id, pepper, mgmt_token)
@@ -999,8 +1033,9 @@ def _get_int_or_none(json: dict, key):
 
 
 @app.route(play_url, methods=['GET', 'POST'])
-def action(session_id, pepper, player_id, player_token):
+def play(session_id, pepper, player_id, player_token):
     check_player_token(session_id, pepper, player_id, player_token)
+    _eot_heartbeat_tasks(session_id, pepper)
 
     if request.method == 'GET':
         return session_state(session_id, player_id)
