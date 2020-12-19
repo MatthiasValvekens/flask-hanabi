@@ -33,8 +33,8 @@ babel = Babel(app, default_domain='hanabi')
 
 DATE_FORMAT_STR = '%Y-%m-%d %H:%M:%S'
 MAX_NAME_LENGTH = 250
-MAX_HELD_CARDS = 5
 MAX_HINT_LENGTH = 50
+CARD_DIST_PER_COLOUR = [3, 2, 2, 2, 1]
 
 
 def init_db():
@@ -90,7 +90,6 @@ class HanabiSession(db.Model):
     # game settings
     cards_in_hand = db.Column(db.Integer, nullable=False)
     created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    colours = db.Column(db.Integer, nullable=False, default=5)
     post_action_time_limit = db.Column(
         db.Integer, nullable=False,
         default=app.config['POST_ACTION_TIME_LIMIT_SECONDS']
@@ -536,30 +535,98 @@ def query_hand_for_current_player(session: HanabiSession, player_id,
     return hand
 
 
-def query_deck_status(session: HanabiSession, for_update=False):
+class Deck:
+    """
+    Convenience wrappers to draw cards from a deck.
+
+    Note: these are not thread-safe w.r.t. the database state!
+    """
+
+    def __init__(self, pairs):
+        cards = {}
+        total_left = 0
+
+        for card_type, count in pairs:
+            count = max(count, 0)
+            total_left += count
+            cards[card_type] = count
+
+        self.cards = cards
+        self.total_left = total_left
+        self.drawn = set()
+
+    def __getitem__(self, item):
+        return self.cards.get(item, 0)
+
+    def draw(self, rng: random.Random):
+        selected_ix = rng.randrange(self.total_left)
+        cur_ix = 0
+        card_type: CardType
+        for card_type, cards_left in self.cards.items():
+            next_ix = cur_ix + cards_left
+            if selected_ix < next_ix:
+                break
+        else:
+            raise GameStateError("Failed to draw card")
+
+        self.cards[card_type] -= 1
+        self.total_left -= 1
+        self.drawn.add(card_type)
+
+        return card_type
+
+    def update_reserve_queries(self):
+        # assumes that the DB state for this session
+        # didn't change in between requests, and doesn't
+        # add the where clause for sessions
+
+        # register update query
+        for card_type in self.drawn:
+            yield update(DeckReserve).values(
+                {'cards_left': self.cards[card_type]}
+            ).where(
+                DeckReserve.colour == card_type.colour
+                and DeckReserve.num_value == card_type.num_value
+            )
+
+    def execute_update(self, session_id):
+        for upd in self.update_reserve_queries():
+            db.session.execute(
+                upd.where(DeckReserve.session_id == session_id)
+            )
+
+    def __iter__(self):
+        yield from self.cards.items()
+
+
+def query_deck_status(session: HanabiSession, for_update=False) -> Deck:
     reserve_q = DeckReserve.query.filter(
         DeckReserve.session_id == session.id
     )
     if for_update:
         reserve_q = reserve_q.with_for_update()
 
-    deck = defaultdict(int)
+    return Deck(
+        (CardType(reserve.colour, reserve.num_value), reserve.cards_left)
+        for reserve in reserve_q.all()
+    )
 
-    total_left = 0
-    reserve: DeckReserve
-    for reserve in reserve_q.all():
-        count = max(reserve.cards_left, 0)
-        total_left += count
-        deck[CardType(reserve.colour, reserve.num_value)] = count
 
-    return total_left, deck
+def _draw_cards(positions, deck: Deck, rng: random.Random, session_id, player_id):
+    if deck.total_left < len(positions):
+        raise ActionNotValid("Not enough cards left to draw")
+
+    for pos in positions:
+        card_type = deck.draw(rng)
+        yield HeldCard(
+            session_id=session_id, player_id=player_id,
+            colour=card_type.colour, num_value=card_type.num_value,
+            card_position=pos,
+        )
 
 
 def draw_card(session: HanabiSession, player_id, pepper):
-    total_left, deck = query_deck_status(session, for_update=True)
-
-    if not total_left:
-        raise ActionNotValid("No cards left to draw")
+    deck = query_deck_status(session, for_update=True)
 
     cur_hand = query_hand_for_current_player(session, player_id, for_update=True)
 
@@ -570,34 +637,12 @@ def draw_card(session: HanabiSession, player_id, pepper):
         raise ActionNotValid("No free slots in hand")
 
     rng = random.Random(session.current_seed(pepper))
-    selected_ix = rng.randrange(total_left)
-    cur_ix = 0
-    card_type: CardType
-    for card_type, cards_left in deck.items():
-        next_ix = cur_ix + cards_left
-        if selected_ix < next_ix:
-            break
-    else:
-        raise GameStateError("Failed to draw card")
 
-    deck_update_q = update(DeckReserve).values(
-        {'cards_left': DeckReserve.cards_left - 1}
-    ).where(
-        DeckReserve.session_id == session.id
-        and DeckReserve.colour == card_type.colour
-        and DeckReserve.num_value == card_type.num_value
-    )
-
-    drawn_card = HeldCard(
-        session_id=session.id, player_id=player_id,
-        colour=card_type.colour, num_value=card_type.num_value,
-        card_position=pos
-    )
-
-    db.session.execute(deck_update_q)
+    drawn_card, = _draw_cards((pos,), deck, rng, session.id, player_id)
     db.session.add(drawn_card)
+    deck.execute_update(session.id)
 
-    return total_left - 1
+    return deck.total_left
 
 
 def stop_game(session: HanabiSession):
@@ -791,6 +836,56 @@ def give_hint(session: HanabiSession, target_player_id: int,
     finish_action(session, log)
 
 
+def init_session(session: HanabiSession, pepper):
+    if session.round_start is not None:
+        # this (probably) points towards a select for update lock
+        # doing its job.
+        return
+
+    # clear old data
+    for model in (DeckReserve, Fireworks, ActionLog, HeldCard):
+        model.query.filter(
+            model.session_id == session.id
+        ).delete()
+
+    hand_size = 4 if session.players_present in (2, 3) else 5
+    session.cards_in_hand = hand_size
+
+    # insert initial fireworks
+    db.session.bulk_save_objects(
+        Fireworks(session_id=session.id, colour=col, current_value=0)
+        for col in range(session.colour_count)
+    )
+
+    rng = random.Random(session.current_seed(pepper) + 'init')
+    deck = Deck(
+        (CardType(colour=col, num_value=ix + 1), count)
+        for col in range(session.colour_count)
+        for ix, count in enumerate(CARD_DIST_PER_COLOUR)
+    )
+
+    player_ids = select(Player.id).filter(
+        Player.session_id == session.id
+    ).order_by(Player.position).all()
+
+    # draw all hand cards
+    def _hands_gen():
+        for player_id in player_ids:
+            yield from _draw_cards(
+                set(range(hand_size)), deck, rng,
+                session.id, player_id
+            )
+
+    # insert hand cards
+    db.session.bulk_save_objects(_hands_gen())
+
+    # initialise the deck reserves
+    db.session.bulk_save_objects(
+        DeckReserve(
+            session_id=session.id, colour=card_type.colour,
+            num_value=card_type.num_value, cards_left=cards_left
+        ) for card_type, cards_left in deck
+    )
 
 
 @app.route(mgmt_url, methods=['POST', 'DELETE'])
@@ -800,28 +895,45 @@ def manage_session(session_id, pepper, mgmt_token):
     if request.method == 'DELETE':
         HanabiSession.query.filter(HanabiSession.id == session_id).delete()
         db.session.commit()
-        return jsonify({}), 204
+        return jsonify({}), 200
 
     if request.method == 'POST':
-        # prepare a new round
+        # game initialisation logic
+
         sess: HanabiSession = HanabiSession.for_update(
             session_id, allow_nonexistent=True
         )
         if sess is None:
             abort(410, "Session has ended")
+        round_start = sess.round_start
+        if round_start is not None:
+            # TODO provide a clean mechanism to stop the game and
+            #  start a new one in the same session.
+            # already initialised, nothing to do
+            return {
+                'round_start': round_start.strftime(DATE_FORMAT_STR)
+            }, 200
+
         player_q = Player.query.filter(Player.session_id == session_id)
-        if db.session.query(~player_q.exists()).scalar():
-            return abort(409, "Cannot advance round without players")
-        # TODO delete scores if we're skipping ahead
+        if db.session.query(player_q.count()).scalar() >= 2:
+            return abort(409, "Cannot start game without at least two players")
 
         json_data = request.get_json()
         until_start = app.config['DEFAULT_COUNTDOWN_SECONDS']
         if json_data is not None:
             until_start = json_data.get('until_start', until_start)
-        sess.round_start = datetime.utcnow() + timedelta(seconds=until_start)
+
+        # initialise the session
+        init_session(sess, pepper)
+
+        sess.round_start = round_start = \
+            datetime.utcnow() + timedelta(seconds=until_start)
+
+        db.session.commit()
+
         return {
-            'round_start': sess.round_start.strftime(DATE_FORMAT_STR)
-        }
+           'round_start': round_start.strftime(DATE_FORMAT_STR)
+        }, 200
 
 
 @app.route(session_url_base + '/join/<inv_token>', methods=['POST'])
@@ -851,11 +963,10 @@ def session_join(session_id, pepper, inv_token):
     }, 201
 
 
+@app.route(play_url, methods=['GET', 'PUT'])
 def play(session_id, pepper, player_id, player_token):
     check_player_token(session_id, pepper, player_id, player_token)
 
-    # the existence check happens later, so in principle players who
-    #  left the session can still watch
     if request.method == 'GET':
         return session_state(session_id, player_id)
 
@@ -867,5 +978,7 @@ def play(session_id, pepper, player_id, player_token):
     if round_start is None:
         return abort(409, description="Round not started")
 
+    if sess.active_player_id != player_id:
+        return abort(409, description="Player acting out of turn")
 
     return jsonify({}), 201
