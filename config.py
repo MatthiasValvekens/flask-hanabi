@@ -1,5 +1,11 @@
 import os
+import secrets
+from binascii import unhexlify
 from dataclasses import MISSING
+
+
+class EnvMissingError(ValueError):
+    pass
 
 
 def get_env_setting(setting, default=MISSING):
@@ -10,7 +16,7 @@ def get_env_setting(setting, default=MISSING):
     except KeyError:
         if default is MISSING:
             error_msg = "Set the %s env variable" % setting
-            raise ValueError(error_msg)
+            raise EnvMissingError(error_msg)
         env = default
 
     if isinstance(env, str):
@@ -30,3 +36,8 @@ TOKEN_COUNT = 8
 COLOUR_COUNT = 5
 POST_ACTION_TIME_LIMIT_SECONDS = 10
 API_BASE_URL = get_env_setting('API_BASE_URL', '')
+
+try:
+    SECRET_KEY = unhexlify(get_env_setting('SECRET_KEY'))
+except EnvMissingError:
+    SECRET_KEY = secrets.token_bytes(32)

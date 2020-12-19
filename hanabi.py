@@ -27,8 +27,6 @@ app = Flask(__name__, static_folder='static', static_url_path='/static')
 
 
 app.config.from_object(config)
-# FIXME this is bad mojo with multiple workers
-app.config['SECRET_KEY'] = server_key = secrets.token_bytes(32)
 db = SQLAlchemy(app)
 babel = Babel(app, default_domain='hanabi')
 
@@ -46,7 +44,10 @@ def init_db():
     #  we don't use create_all because the effective score wrapper
     #  should never be created by SQLAlchemy
     bind = db.session.bind
-    for Model in (HanabiSession, Player):
+    models = (
+        HanabiSession, Player, HeldCard, Fireworks, DeckReserve, ActionLog
+    )
+    for Model in models:
         Model.__table__.create(bind, checkfirst=True)
 
     with db.engine.connect() as con:
@@ -278,7 +279,7 @@ class ActionLog(db.Model):
 
 
 def gen_salted_token(salt, *args):
-    hmac_key = hashlib.sha1(salt + server_key).digest()
+    hmac_key = hashlib.sha1(salt + app.config['SECRET_KEY']).digest()
     token_data = ''.join(str(d) for d in args)
     salted_hmac = hmac.new(
         hmac_key, msg=token_data.encode('ascii'),
