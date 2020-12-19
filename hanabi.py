@@ -7,6 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import auto
+from typing import List
 
 from babel import Locale
 
@@ -129,6 +130,8 @@ class HanabiSession(db.Model):
         nullable=True
     )
 
+    final_score =db.Column(db.Integer, nullable=True)
+
     @classmethod
     def for_update(cls, session_id, *, allow_nonexistent=False):
         q = cls.query.filter(cls.id == session_id).with_for_update()
@@ -136,6 +139,17 @@ class HanabiSession(db.Model):
             return q.one_or_none()
         else:
             return q.one()
+
+    def current_seed(self, pepper):
+        return str(self.turn) + pepper + app.config['SECRET_KEY'].hex()
+
+    def current_action(self) -> 'ActionLog':
+        try:
+            return ActionLog.query.filter(
+                ActionLog.session_id == self.id and ActionLog.turn == self.turn
+            ).one()
+        except NoResultFound:
+            raise GameStateError("no current action available")
 
     def __repr__(self):
         fmt_ts = self.created.now().strftime(DATE_FORMAT_STR)
@@ -226,9 +240,9 @@ class DeckReserve(db.Model):
 
 
 class ActionType(enum.Enum):
-    hint = auto()
-    discard = auto()
-    play = auto()
+    HINT = auto()
+    DISCARD = auto()
+    PLAY = auto()
 
 
 class ActionLog(db.Model):
@@ -276,6 +290,24 @@ class ActionLog(db.Model):
         db.Integer, db.ForeignKey('player.id', ondelete='cascade'),
         nullable=True
     )
+
+    def as_json(self):
+        action_type: ActionType = self.action_type
+        result = {
+            'type': action_type.name,
+            'colour': self.colour,
+            'num_value': self.num_value,
+        }
+        if action_type == ActionType.HINT:
+            result['hint_positions'] = self.hint_positions
+            result['hint_target'] = self.hint_target
+        else:
+            result['hand_pos'] = self.hand_pos
+            if action_type == ActionType.PLAY:
+                result['was_error'] = self.was_error
+        return result
+
+
 
 
 def gen_salted_token(salt, *args):
@@ -368,8 +400,75 @@ def check_player_token(session_id, pepper, player_id, player_token):
         abort(403, description="Bad player token")
 
 
-def session_state(session_id, pepper):
-    pass  # TODO implement
+class Status(enum.IntEnum):
+    # waiting for start announcement
+    INITIAL = 0
+    # waiting for game to start
+    PRE_START = 1
+    # waiting for player action
+    PLAYER_THINKING = 2
+    # waiting for turn to end
+    TURN_END = 3
+    # game scored
+    GAME_OVER = 4
+
+
+def session_state(session_id: int, calling_player: int):
+
+    sess: HanabiSession = HanabiSession.query\
+        .filter(HanabiSession.id == session_id).one_or_none()
+    if sess is None:
+        abort(410, description="Session has ended")
+
+    players = Player.query.filter(Player.session_id == session_id)
+    player_json_objects = {
+        p.id: {'player_id': p.id, 'name': p.name}
+        for p in players
+    }
+    response = {
+        'created': sess.created,
+        'players': list(player_json_objects.values())
+    }
+    round_start = sess.round_start
+    if round_start is None:
+        response['status'] = Status.INITIAL
+        return response
+
+    now = datetime.utcnow()
+    response['round_start'] = round_start.strftime(DATE_FORMAT_STR)
+    response['colour_count'] = sess.colour_count
+    if now < sess.round_start:
+        response['status'] = Status.PRE_START
+        return response
+    elif sess.final_score is not None:
+        response['status'] = Status.GAME_OVER
+        response['score'] = sess.final_score
+        return response
+
+    # if we're here, the game is actually running
+
+    response['active_player'] = sess.active_player_id
+    # grab the status of the fireworks as they are now
+    response['current_fireworks'] = query_fireworks_status(sess)
+
+    # tweak player json objects to include their hands
+    hands = query_hands_for_others(sess, calling_player)
+    for player_id, player_json in player_json_objects.items():
+        if player_id == calling_player:
+            continue
+        player_json['hand'] = hands[player_id]
+
+    # ... and regenerate the corresponding response entry
+    response['players'] = list(player_json_objects.values())
+
+    if sess.end_turn_at is None:
+        response['status'] = Status.PLAYER_THINKING
+    else:
+        response['last_action'] = sess.current_action().as_json()
+        response['turn_ends_at'] = sess.end_turn_at.strftime(DATE_FORMAT_STR)
+        response['status'] = Status.TURN_END
+
+    return response
 
 
 class GameStateError(ValueError):
@@ -387,7 +486,8 @@ class ActionNotValid(ValueError):
     pass
 
 
-def query_fireworks_status(session: HanabiSession, for_update=False):
+def query_fireworks_status(session: HanabiSession, for_update=False) \
+        -> List[int]:
     fireworks = [0] * session.colour_count
     fireworks_q = Fireworks.query.filter(
         Fireworks.session_id == session.id
@@ -404,10 +504,10 @@ def query_fireworks_status(session: HanabiSession, for_update=False):
     return fireworks
 
 
-def query_hands_for_others(session: HanabiSession, player: Player):
+def query_hands_for_others(session: HanabiSession, player_id: int):
     hands_q = HeldCard.query.filter(
         HeldCard.session_id == session.id
-        and HeldCard.player_id != player.id
+        and HeldCard.player_id != player_id
     )
     result = defaultdict(lambda: [None] * session.cards_in_hand)
     card: HeldCard
@@ -455,7 +555,7 @@ def query_deck_status(session: HanabiSession, for_update=False):
     return total_left, deck
 
 
-def draw_card(session: HanabiSession, player_id):
+def draw_card(session: HanabiSession, player_id, pepper):
     total_left, deck = query_deck_status(session, for_update=True)
 
     if not total_left:
@@ -469,7 +569,8 @@ def draw_card(session: HanabiSession, player_id):
     else:
         raise ActionNotValid("No free slots in hand")
 
-    selected_ix = random.randint(0, total_left - 1)
+    rng = random.Random(session.current_seed(pepper))
+    selected_ix = rng.randrange(total_left)
     cur_ix = 0
     card_type: CardType
     for card_type, cards_left in deck.items():
@@ -616,7 +717,7 @@ def play_card(session: HanabiSession, pos: int):
     # log action for consumption by other users
     log = ActionLog(
         session_id=session.id, turn=session.turn,
-        action_type=ActionType.play,
+        action_type=ActionType.PLAY,
         colour=card_type.colour, num_value=card_type.num_value,
         hand_pos=pos, was_error=not playable
     )
@@ -638,7 +739,7 @@ def discard_card(session: HanabiSession, pos: int):
     # log action for consumption by other users
     log = ActionLog(
         session_id=session.id, turn=session.turn,
-        action_type=ActionType.discard,
+        action_type=ActionType.DISCARD,
         colour=card_type.colour, num_value=card_type.num_value,
         hand_pos=pos
     )
@@ -682,7 +783,7 @@ def give_hint(session: HanabiSession, target_player_id: int,
 
     log = ActionLog(
         session_id=session.id, turn=session.turn,
-        action_type=ActionType.hint,
+        action_type=ActionType.HINT,
         colour=colour, num_value=num_value,
         hint_positions=pos_string, hint_target=target_player_id,
     )
