@@ -17,6 +17,8 @@ from flask_sqlalchemy import SQLAlchemy
 
 import random
 
+from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
+
 import config
 
 logger = logging.getLogger(__name__)
@@ -113,7 +115,7 @@ class HanabiSession(db.Model):
 
     # if the active player already performed an action, and we're waiting
     # for them to end their turn
-    turn_action_performed = db.Column(db.DateTime, nullable=True)
+    turn_action_performed_ts = db.Column(db.DateTime, nullable=True)
 
     # True if the currently active player needs to draw a card when
     # their turn ends
@@ -121,7 +123,7 @@ class HanabiSession(db.Model):
 
     # if this value is non-null, the game will stop when the selected player
     # gets their next turn
-    stop_game_before = db.Column(
+    stop_game_after = db.Column(
         db.Integer, db.ForeignKey('player.id', ondelete='cascade'),
         nullable=True
     )
@@ -178,6 +180,9 @@ class HeldCard(db.Model):
 
     # 0-indexed position in the player's hand
     card_position = db.Column(db.Integer, nullable=False)
+
+    def get_type(self):
+        return CardType(self.colour, self.num_value)
 
     def __repr__(self):
         return '<HeldCard %d (col %d)>' % (
@@ -493,14 +498,24 @@ def draw_card(session: HanabiSession, player_id):
     return total_left - 1
 
 
+def stop_game(session: HanabiSession):
+    pass  # TODO implement
+
+
 def end_turn(session: HanabiSession):
     # invoked when the end-of-turn timer is triggered, or
     # through the end-of-turn endpoint
 
-    if not session.turn_action_performed:
-        raise ActionNotValidNow(
-            "The player needs to perform an action first"
-        )
+    if not session.turn_action_performed_ts:
+        # This may be None because of a race condition
+        #  (i.e. us getting the lock after someone else already
+        #  triggered end_turn)
+        #  -> no biggie, just bail
+        return
+
+    if session.active_player_id == session.stop_game_after:
+        stop_game(session)
+        return
 
     player = Player.query.get(session.active_player_id)
     if session.need_draw:
@@ -509,7 +524,7 @@ def end_turn(session: HanabiSession):
 
             # no cards left in the deck --> final round time
             if not total_left:
-                session.stop_game_before = player.id
+                session.stop_game_after = player.id
         except ActionNotValidNow:
             # no cards left in the deck, that's OK
             pass
@@ -523,10 +538,73 @@ def end_turn(session: HanabiSession):
 
     # reset stuff for next round
     session.need_draw = False
+    session.turn_action_performed_ts = None
     session.turn_action_performed = None
     session.active_player_id = next_player.id
     session.turn = HanabiSession.turn + 1
 
+    db.session.commit()
+
+
+def play_card(session: HanabiSession, pos: int):
+
+    if not (0 <= pos < session.cards_in_hand):
+        raise ActionNotValidNow(
+            f"Position {pos} is not a valid card position"
+        )
+
+    player_id = session.active_player_id
+
+    filter_expr = (
+        HeldCard.player_id == player_id
+        and HeldCard.card_position == pos
+    )
+    held: HeldCard = HeldCard.query.filter(filter_expr).one_or_none()
+
+    # can happen during last round, in some variants
+    # (not relevant yet, though)
+    if held is None:
+        raise ActionNotValidNow(
+            f"There\'s no card at position {pos}."
+        )
+
+    card_type = held.get_type()
+
+    # clear the card slot
+    HeldCard.query.filter(filter_expr).delete()
+
+    # now, we need to figure out whether the card is playable
+
+    fw: Fireworks
+    try:
+        fw = Fireworks.query.filter(
+            Fireworks.session_id == session.id
+            and Fireworks.colour == card_type.colour
+        ).one()
+    except NoResultFound:
+        raise GameStateError("Fireworks not instantiated properly")
+
+    playable = fw.current_value == card_type.num_value + 1
+
+    if playable:
+        fw.current_value += 1
+    elif session.errors_remaining == 1:
+        stop_game(session)
+    else:
+        session.errors_remaining -= 1
+
+    # log action for consumption by other users
+    log = ActionLog(
+        session_id=session.id, turn=session.turn,
+        action_type=ActionType.play,
+        colour=card_type.colour, num_value=card_type.num_value,
+        hand_pos=pos, was_error=not playable
+    )
+    db.session.add(log)
+
+    # end-of-turn preparation
+    session.need_draw = True
+    session.turn_action_performed_ts = datetime.utcnow()
     db.session.commit()
 
 
