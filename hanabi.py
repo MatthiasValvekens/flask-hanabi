@@ -241,9 +241,9 @@ class DeckReserve(db.Model):
 
 
 class ActionType(enum.Enum):
-    HINT = auto()
-    DISCARD = auto()
-    PLAY = auto()
+    HINT = 'HINT'
+    DISCARD = 'DISCARD'
+    PLAY = 'PLAY'
 
 
 class ActionLog(db.Model):
@@ -307,8 +307,6 @@ class ActionLog(db.Model):
             if action_type == ActionType.PLAY:
                 result['was_error'] = self.was_error
         return result
-
-
 
 
 def gen_salted_token(salt, *args):
@@ -974,6 +972,16 @@ def _ensure_active_player(session_id, player_id):
     return sess
 
 
+def _get_int_or_none(json: dict, key):
+    val = json.get(key, None)
+    if val is not None:
+        try:
+            val = int(val)
+        except ValueError:
+            return abort(400, f"Improper value for {key}")
+    return val
+
+
 @app.route(play_url, methods=['GET', 'POST'])
 def action(session_id, pepper, player_id, player_token):
     check_player_token(session_id, pepper, player_id, player_token)
@@ -984,9 +992,34 @@ def action(session_id, pepper, player_id, player_token):
     sess = _ensure_active_player(session_id, player_id)
 
     if sess.end_turn_at is not None:
-        abort(409, description="Action already submitted")
+        return abort(409, description="Action already submitted")
 
-    # TODO execute the requested action
+    request_data = request.get_json()
+    try:
+        action_type = ActionType(request_data['type'])
+    except (KeyError, ValueError):
+        return abort(400, "Improper action type specification.")
+
+    colour = _get_int_or_none(request_data, 'colour')
+    num_value = _get_int_or_none(request_data, 'num_value')
+    position = _get_int_or_none(request_data, 'position')
+    if action_type == ActionType.HINT:
+        try:
+            hint_target = int(request_data['hint_target'])
+        except (KeyError, ValueError):
+            return abort(400, "Improper hint_target specification.")
+
+        give_hint(
+            sess, target_player_id=hint_target, colour=colour,
+            num_value=num_value
+        )
+    else:
+        if position is None:
+            raise abort(400, "Position is a mandatory parameter")
+        if action_type == ActionType.DISCARD:
+            discard_card(sess, position)
+        else:
+            play_card(sess, position)
 
     return jsonify({}), 200
 
