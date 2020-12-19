@@ -419,7 +419,7 @@ def session_state(session_id: int, calling_player: int = None):
     sess: HanabiSession = HanabiSession.query\
         .filter(HanabiSession.id == session_id).one_or_none()
     if sess is None:
-        return abort(410, "Session has ended")
+        return abort(410, description="Session has ended")
 
     players = Player.query.filter(Player.session_id == session_id)
     player_json_objects = {
@@ -682,7 +682,7 @@ def end_turn(session: HanabiSession, pepper):
     # compute score
     score = db.session.query(
         func.sum(Fireworks.current_value)
-    ).where(Fireworks.session_id == session.id).scalar()
+    ).filter(Fireworks.session_id == session.id).scalar()
     # check if the score is maxed out or if the last round is over
     if score == session.colour_count * MAX_NUM_VALUE or \
             session.active_player_id == session.stop_game_after:
@@ -969,7 +969,9 @@ def manage_session(session_id, pepper, mgmt_token):
             return jsonify({}), 200
 
         if sess.players_present < 2:
-            return abort(409, "Cannot start game without at least two players")
+            return abort(
+                409, description="Cannot start game without at least two players"
+            )
 
         # initialise the session
         init_session(sess, pepper)
@@ -1047,11 +1049,11 @@ def play(session_id, pepper, player_id, player_token):
 
     request_data = request.get_json()
     if request_data is None:
-        return abort(400, "No request data")
+        return abort(400, description="No request data")
     try:
         action_type = ActionType(request_data['type'])
     except (KeyError, ValueError):
-        return abort(400, "Improper action type specification.")
+        return abort(400, description="Improper action type specification.")
 
     colour = _get_int_or_none(request_data, 'colour')
     num_value = _get_int_or_none(request_data, 'num_value')
@@ -1060,7 +1062,7 @@ def play(session_id, pepper, player_id, player_token):
         try:
             hint_target = int(request_data['hint_target'])
         except (KeyError, ValueError):
-            return abort(400, "Improper hint_target specification.")
+            return abort(400, description="Improper hint_target specification.")
 
         give_hint(
             sess, target_player_id=hint_target, colour=colour,
@@ -1068,7 +1070,7 @@ def play(session_id, pepper, player_id, player_token):
         )
     else:
         if position is None:
-            raise abort(400, "Position is a mandatory parameter")
+            raise abort(400, description="Position is a mandatory parameter")
         if action_type == ActionType.DISCARD:
             discard_card(sess, position)
         else:
@@ -1081,6 +1083,9 @@ def play(session_id, pepper, player_id, player_token):
 def advance(session_id, pepper, player_id, player_token):
     check_player_token(session_id, pepper, player_id, player_token)
     sess = _ensure_active_player(session_id, player_id)
+    if sess.end_turn_at is None:
+        return abort(409, description="Action required")
+
     end_turn(sess, pepper)
     return session_state(session_id, player_id)
 

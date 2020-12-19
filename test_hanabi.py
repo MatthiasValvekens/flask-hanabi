@@ -178,6 +178,11 @@ def test_play_one_playable_card(client):
         gc2.play_url, data={'type': 'PLAY', 'position': 0}
     )
     assert response.status_code == 409, response.get_json()
+
+    # can't advance yet either
+    response = client.post(gc1.play_url + '/advance')
+    assert response.status_code == 409, response.get_json()
+
     response = request_json(
         client, 'post',
         gc1.play_url, data={'type': 'PLAY', 'position': 0}
@@ -193,7 +198,8 @@ def test_play_one_playable_card(client):
 
     assert rdata['players'][0]['hand'][0] is None
     assert rdata['current_fireworks'] == [0, 0, 0, 0, 1]
-    assert rdata['']
+    assert rdata['errors_remaining'] == 3
+    assert rdata['active_player'] == gc1.player_id
     action = rdata['last_action']
     assert action['type'] == 'PLAY'
     assert action['colour'] == P1_INITIAL_HAND[0]['colour']
@@ -201,3 +207,9 @@ def test_play_one_playable_card(client):
     assert action['hand_pos'] == 0
     assert action['was_error'] is False
 
+    # trigger end-of-turn
+    client.post(gc1.play_url + '/advance')
+    response = client.get(gc2.play_url)
+    rdata = response.get_json()
+    assert rdata['players'][0]['hand'][0] is not None
+    assert rdata['active_player'] == gc2.player_id
