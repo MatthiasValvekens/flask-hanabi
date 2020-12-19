@@ -12,7 +12,7 @@ from babel import Locale
 
 from flask import Flask, abort, request, jsonify, render_template
 from flask_babel import Babel, get_locale, format_timedelta
-from sqlalchemy import UniqueConstraint, update, select, func, desc
+from sqlalchemy import UniqueConstraint, update, select, func, desc, and_
 from flask_sqlalchemy import SQLAlchemy
 
 import random
@@ -160,7 +160,10 @@ class HanabiSession(db.Model):
     def current_action(self) -> 'ActionLog':
         try:
             return ActionLog.query.filter(
-                ActionLog.session_id == self.id and ActionLog.turn == self.turn
+                and_(
+                    ActionLog.session_id == self.id,
+                    ActionLog.turn == self.turn
+                )
             ).one()
         except NoResultFound:
             raise GameStateError("no current action available")
@@ -208,7 +211,7 @@ class HeldCard(db.Model):
     card_position = db.Column(db.Integer, primary_key=True)
 
     def get_type(self):
-        return CardType(self.colour, self.num_value)
+        return CardType(colour=self.colour, num_value=self.num_value)
 
     def __repr__(self):
         return '<HeldCard %d (col %d)>' % (
@@ -443,6 +446,8 @@ def session_state(session_id: int, calling_player: int = None):
     response['active_player'] = sess.active_player_id
     # grab the status of the fireworks as they are now
     response['current_fireworks'] = query_fireworks_status(sess)
+    response['errors_remaining'] = sess.errors_remaining
+    response['tokens_remaining'] = sess.tokens_remaining
 
     # tweak player json objects to include their hands,
     # unless called with calling_player None, which is the management API.
@@ -506,8 +511,10 @@ def query_fireworks_status(session: HanabiSession, for_update=False) \
 def query_hands_for_others(session: HanabiSession, player_id: int)\
         -> Dict[int, List[Optional[HeldCard]]]:
     hands_q = HeldCard.query.filter(
-        HeldCard.session_id == session.id
-        and HeldCard.player_id != player_id
+        and_(
+            HeldCard.session_id == session.id,
+            HeldCard.player_id != player_id
+        )
     )
     result = defaultdict(lambda: [None] * session.cards_in_hand)
     card: HeldCard
@@ -698,8 +705,9 @@ def end_turn(session: HanabiSession, pepper):
     # go to the next player
     next_player_pos = (player.position + 1) % session.players_present
     next_player = Player.query.filter(
-        Player.session_id == session.id
-        and Player.position == next_player_pos
+        and_(
+            Player.session_id == session.id, Player.position == next_player_pos
+        )
     ).one()
 
     # reset stuff for next round
@@ -720,9 +728,8 @@ def use_card(session: HanabiSession, pos: int) -> CardType:
 
     player_id = session.active_player_id
 
-    filter_expr = (
-            HeldCard.player_id == player_id
-            and HeldCard.card_position == pos
+    filter_expr = and_(
+        HeldCard.player_id == player_id, HeldCard.card_position == pos
     )
     held: HeldCard = HeldCard.query.filter(filter_expr).one_or_none()
 
@@ -762,10 +769,10 @@ def play_card(session: HanabiSession, pos: int):
 
     fw: Fireworks
     try:
-        fw = Fireworks.query.filter(
-            Fireworks.session_id == session.id
-            and Fireworks.colour == card_type.colour
-        ).one()
+        fw = Fireworks.query.filter(and_(
+            Fireworks.session_id == session.id,
+            Fireworks.colour == card_type.colour
+        )).one()
     except NoResultFound:
         raise GameStateError("Fireworks not instantiated properly")
 
@@ -779,7 +786,7 @@ def play_card(session: HanabiSession, pos: int):
     # log action for consumption by other users
     log = ActionLog(
         session_id=session.id, turn=session.turn,
-        action_type=ActionType.PLAY,
+        action_type=ActionType.PLAY, player_id=session.active_player_id,
         colour=card_type.colour, num_value=card_type.num_value,
         hand_pos=pos, was_error=not playable
     )
@@ -801,7 +808,7 @@ def discard_card(session: HanabiSession, pos: int):
     # log action for consumption by other users
     log = ActionLog(
         session_id=session.id, turn=session.turn,
-        action_type=ActionType.DISCARD,
+        action_type=ActionType.DISCARD, player_id=session.active_player_id,
         colour=card_type.colour, num_value=card_type.num_value,
         hand_pos=pos
     )
@@ -821,8 +828,7 @@ def give_hint(session: HanabiSession, target_player_id: int,
         raise ActionNotValid("Self-hints are not allowed, silly.")
 
     player_q = Player.query.filter(
-        Player.id == target_player_id
-        and Player.session_id == session.id
+        and_(Player.id == target_player_id, Player.session_id == session.id)
     )
     if db.session.query(~player_q.exists()).scalar():
         raise ActionNotValid(
@@ -845,7 +851,7 @@ def give_hint(session: HanabiSession, target_player_id: int,
 
     log = ActionLog(
         session_id=session.id, turn=session.turn,
-        action_type=ActionType.HINT,
+        action_type=ActionType.HINT, player_id=session.active_player_id,
         colour=colour, num_value=num_value,
         hint_positions=pos_string, hint_target=target_player_id,
     )
@@ -861,9 +867,7 @@ def init_session(session: HanabiSession, pepper):
 
     # clear old data
     for model in (DeckReserve, Fireworks, ActionLog, HeldCard):
-        model.query.filter(
-            model.session_id == session.id
-        ).delete()
+        model.query.filter(model.session_id == session.id).delete()
 
     hand_size = 4 if session.players_present in (2, 3) else 5
     session.cards_in_hand = hand_size
@@ -1042,6 +1046,8 @@ def play(session_id, pepper, player_id, player_token):
         return abort(409, description="Action already submitted")
 
     request_data = request.get_json()
+    if request_data is None:
+        return abort(400, "No request data")
     try:
         action_type = ActionType(request_data['type'])
     except (KeyError, ValueError):

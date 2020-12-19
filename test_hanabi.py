@@ -42,6 +42,16 @@ def request_json(client, method, url, *args, data, headers=None, **kwargs):
     return req(url, *args, data=json.dumps(data), headers=req_headers, **kwargs)
 
 
+def two_players(client):
+
+    sess = create_session(client)
+    gc1 = create_player_in_session(client, sess, name='tester1')
+    gc2 = create_player_in_session(client, sess, name='tester2')
+    response = client.post(sess.manage_url)
+    assert response.status_code == 200, response.get_json()
+    return sess, gc1, gc2
+
+
 def create_session(client) -> SessionData:
     with hanabi.app.app_context():
         spawn_url = flask.url_for('spawn_session')
@@ -116,6 +126,16 @@ def test_create_destroy_session(client):
     assert response.status_code == 410, response.get_json()
 
 
+# with the test seeds, this is how things are
+P1_INITIAL_HAND = [
+    {'colour': 4, 'num_value': 1}, {'colour': 3, 'num_value': 2},
+    {'colour': 4, 'num_value': 1}, {'colour': 4, 'num_value': 3}
+]
+P2_INITIAL_HAND = [
+    {'colour': 1, 'num_value': 1}, {'colour': 1, 'num_value': 5},
+    {'colour': 1, 'num_value': 3}, {'colour': 4, 'num_value': 5}
+]
+
 def test_create_join(client):
     sess = create_session(client)
     gc1 = create_player_in_session(client, sess, name='tester1')
@@ -148,4 +168,36 @@ def test_create_join(client):
             assert 'hand' not in pdata
         else:
             hand = pdata['hand']
-            assert None not in hand, hand
+            assert hand == P2_INITIAL_HAND, hand
+
+
+def test_play_one_playable_card(client):
+    sess, gc1, gc2 = two_players(client)
+    response = request_json(
+        client, 'post',
+        gc2.play_url, data={'type': 'PLAY', 'position': 0}
+    )
+    assert response.status_code == 409, response.get_json()
+    response = request_json(
+        client, 'post',
+        gc1.play_url, data={'type': 'PLAY', 'position': 0}
+    )
+    assert response.status_code == 200, response.get_json()
+    rdata = response.get_json()
+    assert rdata['current_fireworks'] == [0, 0, 0, 0, 1]
+
+    # check from the other player's point of view
+    response = client.get(gc2.play_url)
+    assert response.status_code == 200, response.get_json()
+    rdata = response.get_json()
+
+    assert rdata['players'][0]['hand'][0] is None
+    assert rdata['current_fireworks'] == [0, 0, 0, 0, 1]
+    assert rdata['']
+    action = rdata['last_action']
+    assert action['type'] == 'PLAY'
+    assert action['colour'] == P1_INITIAL_HAND[0]['colour']
+    assert action['num_value'] == P1_INITIAL_HAND[0]['num_value']
+    assert action['hand_pos'] == 0
+    assert action['was_error'] is False
+
