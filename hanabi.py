@@ -793,12 +793,9 @@ def give_hint(session: HanabiSession, target_player_id: int,
 
 
 
-@app.route(mgmt_url, methods=['GET', 'POST', 'DELETE'])
+@app.route(mgmt_url, methods=['POST', 'DELETE'])
 def manage_session(session_id, pepper, mgmt_token):
     check_mgmt_token(session_id, pepper, mgmt_token)
-
-    if request.method == 'GET':
-        return session_state(session_id, pepper)
 
     if request.method == 'DELETE':
         HanabiSession.query.filter(HanabiSession.id == session_id).delete()
@@ -860,7 +857,7 @@ def play(session_id, pepper, player_id, player_token):
     # the existence check happens later, so in principle players who
     #  left the session can still watch
     if request.method == 'GET':
-        return session_state(session_id, pepper)
+        return session_state(session_id, player_id)
 
     sess = HanabiSession.for_update(session_id, allow_nonexistent=True)
     if sess is None:
