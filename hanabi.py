@@ -34,6 +34,7 @@ babel = Babel(app, default_domain='hanabi')
 DATE_FORMAT_STR = '%Y-%m-%d %H:%M:%S'
 MAX_NAME_LENGTH = 250
 MAX_HINT_LENGTH = 50
+MAX_PLAYERS = 5
 CARD_DIST_PER_COLOUR = [3, 2, 2, 2, 1]
 
 
@@ -132,12 +133,13 @@ class HanabiSession(db.Model):
     final_score =db.Column(db.Integer, nullable=True)
 
     @classmethod
-    def for_update(cls, session_id, *, allow_nonexistent=False):
+    def for_update(cls, session_id, *, allow_nonexistent=False) \
+            -> 'HanabiSession':
         q = cls.query.filter(cls.id == session_id).with_for_update()
-        if allow_nonexistent:
-            return q.one_or_none()
-        else:
-            return q.one()
+        result = q.one_or_none()
+        if result is None and not allow_nonexistent:
+            abort(410, description="Session has ended")
+        return result
 
     def current_seed(self, pepper):
         return str(self.turn) + pepper + app.config['SECRET_KEY'].hex()
@@ -416,8 +418,6 @@ def session_state(session_id: int, calling_player: int):
 
     sess: HanabiSession = HanabiSession.query\
         .filter(HanabiSession.id == session_id).one_or_none()
-    if sess is None:
-        abort(410, description="Session has ended")
 
     players = Player.query.filter(Player.session_id == session_id)
     player_json_objects = {
@@ -900,11 +900,7 @@ def manage_session(session_id, pepper, mgmt_token):
     if request.method == 'POST':
         # game initialisation logic
 
-        sess: HanabiSession = HanabiSession.for_update(
-            session_id, allow_nonexistent=True
-        )
-        if sess is None:
-            abort(410, "Session has ended")
+        sess: HanabiSession = HanabiSession.for_update(session_id)
         round_start = sess.round_start
         if round_start is not None:
             # TODO provide a clean mechanism to stop the game and
@@ -940,9 +936,9 @@ def manage_session(session_id, pepper, mgmt_token):
 def session_join(session_id, pepper, inv_token):
     check_inv_token(session_id, pepper, inv_token)
 
-    sess: HanabiSession = HanabiSession.query.get(session_id)
+    sess: HanabiSession = HanabiSession.for_update(session_id)
 
-    if sess.round_start is not None:
+    if sess.round_start is not None or sess.players_present <= MAX_PLAYERS:
         return abort(409, description="This session is not accepting players.")
 
     submission_json = request.get_json()
@@ -955,6 +951,7 @@ def session_join(session_id, pepper, inv_token):
 
     p = Player(name=name)
     sess.players.append(p)
+    sess.players_present += 1
     db.session.commit()
     return {
         'player_id': p.id,
@@ -963,22 +960,40 @@ def session_join(session_id, pepper, inv_token):
     }, 201
 
 
-@app.route(play_url, methods=['GET', 'PUT'])
-def play(session_id, pepper, player_id, player_token):
+def _ensure_active_player(session_id, player_id):
+
+    sess = HanabiSession.for_update(session_id)
+
+    round_start = sess.round_start
+    if round_start is None:
+        abort(409, description="Round not started")
+
+    if sess.active_player_id != player_id:
+        abort(409, description="Player acting out of turn")
+
+    return sess
+
+
+@app.route(play_url, methods=['GET', 'POST'])
+def action(session_id, pepper, player_id, player_token):
     check_player_token(session_id, pepper, player_id, player_token)
 
     if request.method == 'GET':
         return session_state(session_id, player_id)
 
-    sess = HanabiSession.for_update(session_id, allow_nonexistent=True)
-    if sess is None:
-        return abort(410, description="Session has ended")
+    sess = _ensure_active_player(session_id, player_id)
 
-    round_start = sess.round_start
-    if round_start is None:
-        return abort(409, description="Round not started")
+    if sess.end_turn_at is not None:
+        abort(409, description="Action already submitted")
 
-    if sess.active_player_id != player_id:
-        return abort(409, description="Player acting out of turn")
+    # TODO execute the requested action
 
-    return jsonify({}), 201
+    return jsonify({}), 200
+
+
+@app.route(play_url + '/advance', methods=['POST'])
+def advance(session_id, pepper, player_id, player_token):
+    check_player_token(session_id, pepper, player_id, player_token)
+    sess = _ensure_active_player(session_id, player_id)
+    end_turn(sess)
+    return jsonify({}), 200
