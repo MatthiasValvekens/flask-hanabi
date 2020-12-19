@@ -6,18 +6,18 @@ import hmac
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import IntEnum, Enum, auto
+from enum import auto
 
 from babel import Locale
 
 from flask import Flask, abort, request, jsonify, render_template
 from flask_babel import Babel, get_locale, format_timedelta
-from sqlalchemy import UniqueConstraint, update
+from sqlalchemy import UniqueConstraint, update, select
 from flask_sqlalchemy import SQLAlchemy
 
 import random
 
-from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
+from sqlalchemy.orm.exc import NoResultFound
 
 import config
 
@@ -115,7 +115,7 @@ class HanabiSession(db.Model):
 
     # if the active player already performed an action, and we're waiting
     # for them to end their turn
-    turn_action_performed_ts = db.Column(db.DateTime, nullable=True)
+    end_turn_at = db.Column(db.DateTime, nullable=True)
 
     # True if the currently active player needs to draw a card when
     # their turn ends
@@ -378,7 +378,7 @@ class GameStateError(ValueError):
     pass
 
 
-class ActionNotValidNow(ValueError):
+class ActionNotValid(ValueError):
     """
     Raised when user/server attempts to do something that's not
     allowed and/or impossible at this point in the game.
@@ -458,7 +458,7 @@ def draw_card(session: HanabiSession, player_id):
     total_left, deck = query_deck_status(session, for_update=True)
 
     if not total_left:
-        raise ActionNotValidNow("No cards left to draw")
+        raise ActionNotValid("No cards left to draw")
 
     cur_hand = query_hand_for_current_player(session, player_id, for_update=True)
 
@@ -466,7 +466,7 @@ def draw_card(session: HanabiSession, player_id):
         if card is None:
             break
     else:
-        raise ActionNotValidNow("No free slots in hand")
+        raise ActionNotValid("No free slots in hand")
 
     selected_ix = random.randint(0, total_left - 1)
     cur_ix = 0
@@ -506,7 +506,7 @@ def end_turn(session: HanabiSession):
     # invoked when the end-of-turn timer is triggered, or
     # through the end-of-turn endpoint
 
-    if not session.turn_action_performed_ts:
+    if not session.end_turn_at:
         # This may be None because of a race condition
         #  (i.e. us getting the lock after someone else already
         #  triggered end_turn)
@@ -525,7 +525,7 @@ def end_turn(session: HanabiSession):
             # no cards left in the deck --> final round time
             if not total_left:
                 session.stop_game_after = player.id
-        except ActionNotValidNow:
+        except ActionNotValid:
             # no cards left in the deck, that's OK
             pass
 
@@ -538,33 +538,32 @@ def end_turn(session: HanabiSession):
 
     # reset stuff for next round
     session.need_draw = False
-    session.turn_action_performed_ts = None
-    session.turn_action_performed = None
+    session.end_turn_at = None
     session.active_player_id = next_player.id
     session.turn = HanabiSession.turn + 1
 
     db.session.commit()
 
 
-def play_card(session: HanabiSession, pos: int):
+def use_card(session: HanabiSession, pos: int) -> CardType:
 
     if not (0 <= pos < session.cards_in_hand):
-        raise ActionNotValidNow(
+        raise ActionNotValid(
             f"Position {pos} is not a valid card position"
         )
 
     player_id = session.active_player_id
 
     filter_expr = (
-        HeldCard.player_id == player_id
-        and HeldCard.card_position == pos
+            HeldCard.player_id == player_id
+            and HeldCard.card_position == pos
     )
     held: HeldCard = HeldCard.query.filter(filter_expr).one_or_none()
 
     # can happen during last round, in some variants
     # (not relevant yet, though)
     if held is None:
-        raise ActionNotValidNow(
+        raise ActionNotValid(
             f"There\'s no card at position {pos}."
         )
 
@@ -572,6 +571,26 @@ def play_card(session: HanabiSession, pos: int):
 
     # clear the card slot
     HeldCard.query.filter(filter_expr).delete()
+
+    return card_type
+
+
+def finish_action(session: HanabiSession, log: ActionLog):
+
+    # end-of-turn preparation
+    db.session.add(log)
+
+    session.need_draw = True
+    session.end_turn_at = datetime.utcnow() + timedelta(
+        seconds=session.post_action_time_limit
+    )
+    db.session.commit()
+
+
+def play_card(session: HanabiSession, pos: int):
+
+    # take the card from the player's hand
+    card_type = use_card(session, pos)
 
     # now, we need to figure out whether the card is playable
 
@@ -600,12 +619,76 @@ def play_card(session: HanabiSession, pos: int):
         colour=card_type.colour, num_value=card_type.num_value,
         hand_pos=pos, was_error=not playable
     )
-    db.session.add(log)
 
-    # end-of-turn preparation
-    session.need_draw = True
-    session.turn_action_performed_ts = datetime.utcnow()
-    db.session.commit()
+    finish_action(session, log)
+
+
+def discard_card(session: HanabiSession, pos: int):
+    # first, figure out if the player is even allowed to discard
+    if not session.tokens_remaining:
+        raise ActionNotValid("No discarding tokens left to spend.")
+
+    # take the card from the user's hand
+    card_type = use_card(session, pos)
+
+    # consume a token
+    session.tokens_remaining -= 1
+
+    # log action for consumption by other users
+    log = ActionLog(
+        session_id=session.id, turn=session.turn,
+        action_type=ActionType.discard,
+        colour=card_type.colour, num_value=card_type.num_value,
+        hand_pos=pos
+    )
+
+    finish_action(session, log)
+
+
+def give_hint(session: HanabiSession, target_player_id: int,
+              colour: int = None, num_value: int = None):
+
+    if (colour is None) == (num_value is None):
+        raise ActionNotValid(
+            "Exactly one of colour or num_value must be specified."
+        )
+
+    if target_player_id == session.active_player_id:
+        raise ActionNotValid("Self-hints are not allowed, silly.")
+
+    player_q = Player.query.filter(
+        Player.id == target_player_id
+        and Player.session_id == session.id
+    )
+    if db.session.query(~player_q.exists()).scalar():
+        raise ActionNotValid(
+            "No such player in session."
+        )
+
+    # find out the positions of the cards
+    card_q = select(HeldCard.card_position).where(
+        HeldCard.player_id == target_player_id
+    )
+
+    if colour is not None:
+        card_q = card_q.where(HeldCard.colour == colour)
+    else:
+        card_q = card_q.where(HeldCard.num_value == num_value)
+
+    # ... and format them into a nice, parsable format for the
+    #  UI to use
+    pos_string = ','.join(str(pos) for pos in card_q)
+
+    log = ActionLog(
+        session_id=session.id, turn=session.turn,
+        action_type=ActionType.hint,
+        colour=colour, num_value=num_value,
+        hint_positions=pos_string, hint_target=target_player_id,
+    )
+
+    finish_action(session, log)
+
+
 
 
 @app.route(mgmt_url, methods=['GET', 'POST', 'DELETE'])
