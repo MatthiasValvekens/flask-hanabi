@@ -249,6 +249,10 @@ def test_play_one_unplayable_card(client):
     assert rdata['players'][0]['hand'][1] is not None
     assert rdata['active_player'] == gc2.player_id
 
+    response = client.get(gc1.play_url + '/discarded')
+    rdata = response.get_json()
+    assert rdata['discarded'] == [P1_INITIAL_HAND[1]]
+
 
 def test_discard_one_card(client):
     sess, gc1, gc2 = two_players(client)
@@ -282,6 +286,10 @@ def test_discard_one_card(client):
     rdata = response.get_json()
     assert rdata['players'][0]['hand'][1] is not None
     assert rdata['active_player'] == gc2.player_id
+
+    response = client.get(gc1.play_url + '/discarded')
+    rdata = response.get_json()
+    assert rdata['discarded'] == [P1_INITIAL_HAND[1]]
 
 
 def test_give_hint(client):

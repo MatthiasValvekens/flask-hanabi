@@ -12,7 +12,7 @@ from babel import Locale
 
 from flask import Flask, abort, request, jsonify, render_template
 from flask_babel import Babel, get_locale, format_timedelta
-from sqlalchemy import UniqueConstraint, update, select, func, desc, and_
+from sqlalchemy import UniqueConstraint, update, select, func, desc, and_, or_
 from flask_sqlalchemy import SQLAlchemy
 
 import random
@@ -599,10 +599,10 @@ class Deck:
         for card_type in self.drawn:
             yield update(DeckReserve).values(
                 {'cards_left': self.cards[card_type]}
-            ).where(
-                DeckReserve.colour == card_type.colour
-                and DeckReserve.num_value == card_type.num_value
-            )
+            ).where(and_(
+                DeckReserve.colour == card_type.colour,
+                DeckReserve.num_value == card_type.num_value
+            ))
 
     def execute_update(self, session_id):
         for upd in self.update_reserve_queries():
@@ -1107,9 +1107,16 @@ def discarded(session_id, pepper, player_id, player_token):
     if not sess.game_running:
         return abort(409, "Game is currently not running")
 
-    discarded_cards = select([ActionLog.colour, ActionLog.num_value]).where(
-        ActionLog.session_id == session_id
-        and ActionLog.action_type == ActionType.DISCARD
+    discarded_cards = db.session.query(
+        ActionLog.colour, ActionLog.num_value
+    ).filter(
+        and_(
+            ActionLog.session_id == session_id,
+            or_(
+                ActionLog.action_type == ActionType.DISCARD,
+                ActionLog.was_error == True
+            )
+        )
     ).order_by(desc(ActionLog.turn))
     return {
         'discarded': [
