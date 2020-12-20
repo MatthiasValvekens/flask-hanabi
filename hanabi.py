@@ -482,12 +482,18 @@ class GameStateError(ValueError):
     pass
 
 
+app.register_error_handler(GameStateError, json_err_handler(500))
+
+
 class ActionNotValid(ValueError):
     """
     Raised when user/server attempts to do something that's not
     allowed and/or impossible at this point in the game.
     """
     pass
+
+
+app.register_error_handler(ActionNotValid, json_err_handler(400))
 
 
 def query_fireworks_status(session: HanabiSession, for_update=False) \
@@ -836,18 +842,18 @@ def give_hint(session: HanabiSession, target_player_id: int,
         )
 
     # find out the positions of the cards
-    card_q = select(HeldCard.card_position).where(
+    card_q = db.session.query(HeldCard.card_position).filter(
         HeldCard.player_id == target_player_id
-    )
+    ).order_by(HeldCard.card_position)
 
     if colour is not None:
-        card_q = card_q.where(HeldCard.colour == colour)
+        card_q = card_q.filter(HeldCard.colour == colour)
     else:
-        card_q = card_q.where(HeldCard.num_value == num_value)
+        card_q = card_q.filter(HeldCard.num_value == num_value)
 
     # ... and format them into a nice, parsable format for the
     #  UI to use
-    pos_string = ','.join(str(pos) for pos in card_q)
+    pos_string = ','.join(str(pos) for pos, in card_q)
 
     log = ActionLog(
         session_id=session.id, turn=session.turn,
