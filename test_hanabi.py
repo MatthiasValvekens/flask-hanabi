@@ -213,3 +213,37 @@ def test_play_one_playable_card(client):
     rdata = response.get_json()
     assert rdata['players'][0]['hand'][0] is not None
     assert rdata['active_player'] == gc2.player_id
+
+
+def test_play_one_unplayable_card(client):
+    sess, gc1, gc2 = two_players(client)
+    response = request_json(
+        client, 'post',
+        gc1.play_url, data={'type': 'PLAY', 'position': 1}
+    )
+    assert response.status_code == 200, response.get_json()
+    rdata = response.get_json()
+    assert rdata['current_fireworks'] == [0, 0, 0, 0, 0]
+
+    # check from the other player's point of view
+    response = client.get(gc2.play_url)
+    assert response.status_code == 200, response.get_json()
+    rdata = response.get_json()
+
+    assert rdata['players'][0]['hand'][1] is None
+    assert rdata['current_fireworks'] == [0, 0, 0, 0, 0]
+    assert rdata['errors_remaining'] == 2
+    assert rdata['active_player'] == gc1.player_id
+    action = rdata['last_action']
+    assert action['type'] == 'PLAY'
+    assert action['colour'] == P1_INITIAL_HAND[1]['colour']
+    assert action['num_value'] == P1_INITIAL_HAND[1]['num_value']
+    assert action['hand_pos'] == 1
+    assert action['was_error'] is True
+
+    # trigger end-of-turn
+    client.post(gc1.play_url + '/advance')
+    response = client.get(gc2.play_url)
+    rdata = response.get_json()
+    assert rdata['players'][0]['hand'][0] is not None
+    assert rdata['active_player'] == gc2.player_id
