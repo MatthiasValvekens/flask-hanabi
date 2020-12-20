@@ -292,7 +292,7 @@ def test_discard_one_card(client):
     assert rdata['discarded'] == [P1_INITIAL_HAND[1]]
 
 
-def test_give_hint(client):
+def test_give_num_value_hint(client):
     sess, gc1, gc2 = two_players(client)
     response = request_json(
         client, 'post',
@@ -328,6 +328,35 @@ def test_give_hint(client):
     assert rdata['active_player'] == gc2.player_id
 
 
+def test_give_colour_hint(client):
+    sess, gc1, gc2 = two_players(client)
+    request_json(
+        client, 'post',
+        gc1.play_url, data={
+            'type': 'HINT', 'colour': 1, 'hint_target': gc2.player_id
+        }
+    )
+
+    # check from the other player's point of view
+    response = client.get(gc2.play_url)
+    assert response.status_code == 200, response.get_json()
+    rdata = response.get_json()
+
+    assert None not in rdata['players'][0]['hand'][1]
+    action = rdata['last_action']
+    assert action['type'] == 'HINT'
+    assert action.get('num_value', None) is None
+    assert action['colour'] == 1
+    assert action['hint_target'] == gc2.player_id
+    assert action['hint_positions'] == '0,1,2'
+    assert 'was_error' not in action
+
+    # trigger end-of-turn
+    client.post(gc1.play_url + '/advance')
+    response = client.get(gc2.play_url)
+    rdata = response.get_json()
+    assert rdata['active_player'] == gc2.player_id
+
 def test_no_self_hints(client):
     sess, gc1, gc2 = two_players(client)
     response = request_json(
@@ -349,3 +378,35 @@ def test_no_specific_hints(client):
         }
     )
     assert response.status_code == 400, response.get_json()
+
+
+def test_give_null_hint(client):
+    sess, gc1, gc2 = two_players(client)
+    request_json(
+        client, 'post',
+        gc1.play_url, data={
+            'type': 'HINT', 'num_value': 4, 'hint_target': gc2.player_id
+        }
+    )
+
+    response = client.get(gc2.play_url)
+    assert response.status_code == 200, response.get_json()
+    rdata = response.get_json()
+
+    assert None not in rdata['players'][0]['hand'][1]
+    assert rdata['current_fireworks'] == [0, 0, 0, 0, 0]
+    assert rdata['errors_remaining'] == 3
+    assert rdata['active_player'] == gc1.player_id
+    action = rdata['last_action']
+    assert action['type'] == 'HINT'
+    assert action.get('colour', None) is None
+    assert action['num_value'] == 4
+    assert action['hint_target'] == gc2.player_id
+    assert action['hint_positions'] == ''
+    assert 'was_error' not in action
+
+    # trigger end-of-turn
+    client.post(gc1.play_url + '/advance')
+    response = client.get(gc2.play_url)
+    rdata = response.get_json()
+    assert rdata['active_player'] == gc2.player_id
