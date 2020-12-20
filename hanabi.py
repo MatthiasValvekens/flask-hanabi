@@ -302,6 +302,7 @@ class ActionLog(db.Model):
             'type': action_type.name,
             'colour': self.colour,
             'num_value': self.num_value,
+            'player_id': self.player_id,
         }
         if action_type == ActionType.HINT:
             result['hint_positions'] = self.hint_positions

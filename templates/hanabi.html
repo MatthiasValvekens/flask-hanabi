@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="{{ active_locale.language }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hanabi</title>
+    <link rel="stylesheet" href="/static/css/bulma.min.css">
+    <link rel="stylesheet" href="/static/css/fontawesome-all.min.css">
+    <style>
+        #player-list {
+            display: flex;
+            justify-content: center;
+        }
+
+        #player-list ul {
+            margin-top: 0.5rem;
+            list-style-type: none;
+        }
+
+        #player-list li::before {
+            content: "\f007";
+            font-family: "FontAwesome";
+            margin:0 0.4em 0 -1.2em;
+            color: #7a7a7a;
+        }
+
+        #player-list li.me {
+            font-weight: bold;
+        }
+
+        #lang-select-container {
+            position: absolute;
+            padding-top: 1vh;
+            padding-left: 1vw;
+            left: 0;
+            top: 0;
+        }
+
+        #loading-icon {
+            position: fixed;
+            left: 0;
+            top: 0;
+            font-size: 300%;
+            z-index: 9999;
+        }
+
+        #loading-icon span {
+            padding: 0.5rem;
+        }
+
+        .hanabi-state[data-hanabi-col="0"] {
+            color: #048304;
+        }
+
+        .hanabi-state[data-hanabi-col="1"] {
+            color: #b52d30;
+        }
+
+        .hanabi-state[data-hanabi-col="2"] {
+            color: #cb761a;
+        }
+
+        .hanabi-state[data-hanabi-col="3"] {
+            color: #cb1ac8;
+        }
+
+        .hanabi-state[data-hanabi-col="4"] {
+            color: #1d72aa;
+        }
+
+        .hanabi-card {
+            display: inline-block;
+            border-style: solid;
+            background-color: #f0f0f0;
+            color: black;
+            border-radius: 0.7em;
+            border-width: 0.3em;
+            height: 5.3em;
+            width: 4em;
+            margin: 1em 0.5em;
+            padding: 0.3em;
+            text-align: center;
+            vertical-align: middle;
+
+            cursor: pointer;
+            user-select: none;
+            -moz-user-select: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+        }
+
+        .hanabi-card.hanabi-empty-slot {
+            border-style: dashed;
+            border-width: 0.1em;
+            padding: 0.4em;
+        }
+
+        .hanabi-card.hanabi-card-highlighted {
+            background-color: #f0f0f0;
+            box-shadow: 0.3em 0.3em 1px #888888;
+        }
+
+        .hanabi-card > span {
+            display: block;
+            margin: auto;
+            font-size: 3em;
+        }
+
+        #hanabi-other-players {
+            text-align: center;
+        }
+
+        #hanabi-other-players .hanabi-card-list {
+            font-size: 50%;
+        }
+
+        .hanabi-player-box-container {
+            position: relative;
+            margin-top: 2rem;
+        }
+
+        .hanabi-player-box .title::before {
+            content: "\f007";
+            font-family: "FontAwesome";
+            margin:0 0.4em 0 -1.2em;
+            color: #7a7a7a;
+        }
+
+        .hanabi-player-box.active-player::before {
+            background: #830303;
+            border-radius:2px 2px 0 0;
+            color: #fff;
+            content: "playing";
+            display:inline-block;
+            font-size: 90%;
+            font-weight:700;
+            letter-spacing:1px;
+            padding:3px 5px;
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            text-transform:uppercase;
+            vertical-align:top
+        }
+    </style>
+    <script type="text/javascript" src="/static/js/jquery.min.js"></script>
+    <script type="text/javascript" src="/static/js/moment.js"></script>
+    <script type="module">
+        import * as hanabi from '/static/js/hanabi.js';
+        const controller = hanabi.hanabieController;
+        hanabi.HANABI_CONFIG.apiBaseURL = "{{ api_base_url }}";
+        /** @type {GUIStrings} */
+        hanabi.HANABI_CONFIG.guiStrings = {
+            statusString: function(status) {
+                switch(status) {
+                    case boggle.GameStatus.INITIAL:
+                        return "{% trans %}Waiting for game to start...{% endtrans %}";
+                    case boggle.GameStatus.PRE_START:
+                        return "{% trans %}Round starting in a few moments...{% endtrans %}";
+                    case boggle.GameStatus.PLAYING:
+                        return "{% trans %}Round underway{% endtrans %}";
+                    case boggle.GameStatus.SCORING:
+                        return "{% trans %}Waiting for scores...{% endtrans %}";
+                    case boggle.GameStatus.SCORED:
+                        return "{% trans %}The results are in!{% endtrans %}";
+                    default:
+                        throw "No GUI string available";
+                }
+            }
+        };
+        $(document).ready(
+            function() {
+                controller.getOptions();
+                $('#join-session').click(controller.joinExistingSession);
+                $('#advance-round').click(controller.advanceRound);
+                $('#inv-token-display-copy').click(function () {
+                        const invTokenField = document.getElementById("inv-token-display");
+                        invTokenField.select();
+                        invTokenField.setSelectionRange(0, 100);
+                        document.execCommand("copy");
+                        invTokenField.blur();
+                        const icon = $('#inv-token-display-copy span.fas');
+                        icon.removeClass("fa-clipboard");
+                        icon.addClass("fa-clipboard-check");
+                        $('#inv-token-display-copy').addClass("is-success");
+                    }
+                );
+            }
+        );
+    </script>
+</head>
+<body>
+<div id="loading-icon" style="display: none;"><span class="fas fa-pulse fa-spinner"></span></div>
+<section class="section" id="start-section">
+    <div class="container">
+        <h1 class="title is-1 has-text-centered is-centered">
+            Hanabi
+        </h1>
+        <div class="dropdown is-hoverable" id="lang-select-container">
+            <div class="dropdown-trigger">
+                <button class="button" aria-haspopup="true" aria-controls="lang-select-dropdown">
+                            <span class="icon is-small has-text-grey-light">
+                                <span class="fas fa-language"></span>
+                            </span>
+                    <span>{{ active_locale.display_name }}</span>
+                </button>
+            </div>
+            <div class="dropdown-menu" id="lang-select-dropdown" role="menu">
+                <div class="dropdown-content">
+                    {% for lang in available_locales %}
+                        <a class="dropdown-item" href="?lang={{ lang.language }}">
+                            {{ lang.display_name }}
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="box">
+            <div class="columns is-centered">
+                <div class="column is-half-desktop is-three-quarters-tablet is-full-mobile is-one-third-fullhd has-text-centered">
+                    <h6 class="title is-4">{% trans %}Name{% endtrans %}</h6>
+                    <div class="field">
+                        <label class="label" for="player-name-input">{% trans %}Choose a username{% endtrans %}</label>
+                        <div class="control has-icons-left">
+                            <input id="player-name-input" class="input" type="text" placeholder="{% trans %}Name{% endtrans %}" required>
+                            <span class="icon is-small is-left">
+                                <span class="fas fa-user"></span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <hr/>
+            <div class="columns is-centered">
+                <div class="column is-half-desktop is-three-quarters-tablet is-full-mobile is-one-third-fullhd has-text-centered">
+                    <h6 class="title is-4">{% trans %}Start new session{% endtrans %}</h6>
+                    <div class="field has-addons">
+                        <div class="control">
+                            <button id="spawn-session" class="button is-primary" disabled>
+                                <span>{% trans %}Start{% endtrans %}</span>
+                                <span class="icon is-small">
+                                    <span class="fas fa-chevron-right is-right"></span>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <hr/>
+            <div class="columns is-centered">
+                <div class="column is-half-desktop is-three-quarters-tablet is-full-mobile is-one-third-fullhd has-text-centered">
+                    <h6 class="title is-4">{% trans %}Join existing session{% endtrans %}</h6>
+                    <div class="field has-addons">
+                        <div class="control is-expanded has-icons-left">
+                            <input id="inv-token" class="input" type="text" placeholder="{% trans %}Invitation token{% endtrans %}" pattern="\d+:[0-9a-f]{16}:[0-9a-f]{20}" size="40" aria-label="{% trans %}invitation token{% endtrans %}">
+                            <span class="icon is-small is-left">
+                                          <span class="fas fa-users"></span>
+                                    </span>
+                            <p class="help is-danger" id="inv-token-error" style="display: none;">
+                                {% trans %}This invitation token is not valid.{% endtrans %}
+                            </p>
+                        </div>
+                        <div class="control">
+                            <button id="join-session" class="button is-primary">
+                                <span>{% trans %}Start{% endtrans %}</span>
+                                <span class="icon is-small">
+                                            <span class="fas fa-chevron-right is-right"></span>
+                                        </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="section" id="game-section">
+    <div class="container">
+        <h1 class="title is-1 has-text-centered">Hanabi</h1>
+        <div class="box">
+            <div class="columns">
+                <div class="column is-8 has-text-centered">
+                    <h6 class="has-text-weight-bold">Current fireworks</h6>
+
+                    <div id="current-fireworks" class="hanabi-card-list">
+                        <div class="hanabi-card hanabi-state hanabi-empty-slot" data-hanabi-col="0"></div>
+                        <div class="hanabi-card hanabi-state" data-hanabi-col="1" data-hanabi-num-value="3"><span>3</span></div>
+                        <div class="hanabi-card hanabi-state" data-hanabi-col="2" data-hanabi-num-value="5"><span>5</span></div>
+                        <div class="hanabi-card hanabi-state" data-hanabi-col="3" data-hanabi-num-value="2"><span>2</span></div>
+                        <div class="hanabi-card hanabi-state" data-hanabi-col="4" data-hanabi-num-value="1"><span>1</span></div>
+                    </div>
+                </div>
+                <div class="column is-4">
+                    <h6 class="has-text-weight-bold has-text-centered">Players</h6>
+                    <div id="player-list">
+                        <ul>
+                            <li data-player-id="1">TestPlayer1</li>
+                            <li data-player-id="2">TestPlayer2</li>
+                            <li data-player-id="3">TestPlayer3</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <hr/>
+            <div class="columns">
+
+                <div class="column is-8 has-text-centered">
+                    <h6 class="has-text-weight-bold has-text-centered">Your hand</h6>
+
+                    <div id="player-hand" class="hanabi-card-list">
+                        <div class="hanabi-card hanabi-state hanabi-empty-slot"></div>
+                        <div class="hanabi-card hanabi-state hanabi-card-highlighted"><span>?</span></div>
+                        <div class="hanabi-card hanabi-state"><span>?</span></div>
+                        <div class="hanabi-card hanabi-state hanabi-card-highlighted"><span>?</span></div>
+                    </div>
+                    <div id="player-hint-message">
+                        These are all your <span class="hanabi-state" data-hanabi-col="0">green</span> cards.
+                    </div>
+                </div>
+                <div class="column is-4 has-text-centered" id="side-panel">
+                    <!-- turn instructions go here -->
+                </div>
+            </div>
+        </div>
+        <div class="tile is-ancestor" id="hanabi-other-players">
+            <div class="tile is-parent">
+                <div class="tile is-child box hanabi-player-box-container" data-player-id="2">
+                    <div class="hanabi-player-box">
+                        <p class="title is-6">TestPlayer2</p>
+                        <div class="hanabi-card-list">
+                            <div class="hanabi-card hanabi-state hanabi-empty-slot"></div>
+                            <div class="hanabi-card hanabi-state" data-hanabi-col="1" data-hanabi-num-value="3"><span>3</span></div>
+                            <div class="hanabi-card hanabi-state" data-hanabi-col="2" data-hanabi-num-value="5"><span>5</span></div>
+                            <div class="hanabi-card hanabi-state" data-hanabi-col="4" data-hanabi-num-value="1"><span>1</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tile is-parent">
+                <div class="tile is-child box hanabi-player-box-container" data-player-id="3">
+                    <div class="hanabi-player-box active-player">
+                        <p class="title is-6">TestPlayer3</p>
+                        <div class="hanabi-card-list">
+                            <div class="hanabi-card hanabi-state" data-hanabi-col="3" data-hanabi-num-value="1"><span>1</span></div>
+                            <div class="hanabi-card hanabi-state" data-hanabi-col="2" data-hanabi-num-value="3"><span>3</span></div>
+                            <div class="hanabi-card hanabi-state hanabi-empty-slot"></div>
+                            <div class="hanabi-card hanabi-state" data-hanabi-col="4" data-hanabi-num-value="1"><span>1</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="section" id="manager-controls" style="display: none">
+    <div class="container">
+        <h5 class="title is-5 has-text-centered">{% trans %}Management console{% endtrans %}</h5>
+        <div class="box">
+            <div class="columns is-centered">
+                <div class="column is-half-desktop is-three-quarters-tablet is-full-mobile is-one-third-fullhd">
+                    <div class="field has-addons">
+                        <div class="control is-expanded has-icons-left">
+                            <input id="inv-token-display" class="input" type="text" readonly aria-label="{% trans %}invitation token{% endtrans %}">
+                            <span class="icon is-small is-left">
+                                          <span class="fas fa-users"></span>
+                                    </span>
+                            <p class="help">
+                                {% trans %}Invitation token: click to copy{% endtrans %}
+                            </p>
+                        </div>
+                        <div class="control">
+                            <button id="inv-token-display-copy" class="button is-light">
+                                        <span class="icon is-small">
+                                            <span class="fas fa-clipboard"></span>
+                                        </span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="field has-addons">
+                        <div class="control has-icons-left is-expanded">
+                            <input class="input" type="number" id="round-announce-countdown" value="{{ default_countdown }}" aria-label="{% trans %}countdown to next round{% endtrans %}">
+                            <span class="icon is-left is-small">
+                                        <span class="fas fa-stopwatch"></span>
+                                    </span>
+                            <p class="help">
+                                {% trans trimmed %}
+                                    Number of seconds until next game round.
+                                    If a round is currently underway, it will be suspended.
+                                {% endtrans %}
+                            </p>
+                        </div>
+                        <div class="control">
+                            <button class="button is-primary" id="advance-round">
+                                <span>{% trans %}Announce{% endtrans %}</span>
+                                <span class="icon is-small">
+                                            <span class="fas fa-chevron-right is-right"></span>
+                                        </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+</body>
+</html>
