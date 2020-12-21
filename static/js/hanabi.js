@@ -6,6 +6,7 @@ export {GameStatus} from './hanabi-model.js';
  * @property {function} statusString - Return status text for the given round state
  * @property {string} cardPlayed
  * @property {string} cardDiscarded
+ * @property {string} itsYourTurn
  */
 
 /**
@@ -47,8 +48,8 @@ export const hanabiController = function () {
             return "";
         }
         return `<div class="tile is-parent">
-            <div class="tile is-child box hanabi-player-box">
-                <div class="hanabi-player-box" data-player-id="${player.playerId}">
+            <div class="tile is-child box hanabi-player-box" data-player-id="${player.playerId}">
+                <div>
                     <p class="title is-6">${player.name}</p>
                     <div class="hanabi-card-list">
                     </div>
@@ -238,13 +239,21 @@ export const hanabiController = function () {
             let playerCardViews = gameStateUpdate.playersJoining.map(formatOtherPlayerView).join('');
             playerListUl.append(playerListFmtd);
             $('#hanabi-other-players').append(playerCardViews);
+
             // update status box
-            $('#status-box').text(HANABI_CONFIG.guiStrings.statusString(status));
+            let statusString = HANABI_CONFIG.guiStrings.statusString(status);
 
             if(status !== GameStatus.INITIAL) {
                 updateFireworks();
                 updatePlayerHands();
+                if(gameState.activePlayerId !== playerContext().playerId) {
+                    let filter = `[data-player-id="${gameState.activePlayerId}"]`;
+                    $(`#hanabi-other-players .hanabi-player-box${filter}`).addClass("active-player");
+                } else {
+                    statusString = HANABI_CONFIG.guiStrings.itsYourTurn;
+                }
             }
+            $('#status-box').text(statusString);
             let action = gameState.currentAction;
             if(status === GameStatus.TURN_END && action !== null) {
                 if(action.actionType === ActionType.HINT) {
@@ -292,7 +301,7 @@ export const hanabiController = function () {
     }
 
     function startGame() {
-        $('#advance-round').prop("disabled", true);
+        $('#manager-start-game').prop("disabled", true);
         return callHanabiApi('POST', sessionContext().mgmtEndpoint, {}, function () {
             forceRefresh();
         });
@@ -336,27 +345,53 @@ export const hanabiController = function () {
         });
     }
 
+    /**
+     * @param {int} theId
+     * @param {boolean} processHighlights
+     * @return {string}
+     */
+    function renderHandOfPlayer(theId, processHighlights) {
+        return gameState.cardsHeldBy(theId).map(
+            function(card, index) {
+                let highlight = false;
+                if(processHighlights) {
+                    let act = gameState.currentAction;
+                    // highlight if the card is targeted by a hint
+                    highlight = act && act.actionType === ActionType.HINT
+                        && act.action.targetPlayer === theId
+                        && act.action.positions.includes(index);
+                }
+                if(card === null) {
+                    return emptySlot;
+                } else {
+                    let {colour, numValue} = card;
+                    return formatCard(colour, numValue, highlight);
+                }
+            }
+        ).join('');
+    }
     function updatePlayerHands() {
         $('#hanabi-other-players .hanabi-player-box').each(
             function() {
                 let theId = parseInt($(this).attr('data-player-id'));
-                let hand = gameState.cardsHeldBy(theId).map(
-                    function(card) {
-                        if(card === null) {
-                            return emptySlot;
-                        } else {
-                            let {colour, numValue} = card;
-                            return formatCard(colour, numValue);
-                        }
-                    }
-                ).join('');
+                let hand = renderHandOfPlayer(theId, true);
                 $(this).find('.hanabi-card-list').html(hand);
             }
         )
     }
 
+    function handleHintModal() {
+        if(gameState.isCurrentlyActive) {
+            const hintModal = $('#give-hint-modal');
+            let theId = $(this).attr('data-player-id');
+            hintModal.find('.hanabi-card-list').html(renderHandOfPlayer(theId, false));
+            hintModal.addClass('is-active');
+        }
+    }
+
     return {
         joinExistingSession: joinExistingSession,
-        triggerSessionSpawn: triggerSessionSpawn, startGame: startGame
+        triggerSessionSpawn: triggerSessionSpawn, startGame: startGame,
+        handleHintModal: handleHintModal
     }
 }();

@@ -114,7 +114,7 @@
             font-size: 50%;
         }
 
-        .hanabi-player-box-container {
+        .hanabi-player-box {
             position: relative;
             margin-top: 2rem;
         }
@@ -126,7 +126,7 @@
             color: #7a7a7a;
         }
 
-        .hanabi-player-box.active-player::before {
+        .hanabi-player-box.active-player > div::before {
             background: #830303;
             border-radius:2px 2px 0 0;
             color: #fff;
@@ -166,7 +166,8 @@
                 }
             },
             cardPlayed: "{% trans %}Card played{% endtrans %}",
-            cardDiscarded: "{% trans %}Card discarded{% endtrans %}"
+            cardDiscarded: "{% trans %}Card discarded{% endtrans %}",
+            itsYourTurn: "{% trans %}It's your turn!{% endtrans %}"
         };
         $(document).ready(
             function() {
@@ -185,12 +186,37 @@
                         $('#inv-token-display-copy').addClass("is-success");
                     }
                 );
+
+                function closeHintModal() {
+                    $('#give-hint-modal').removeClass('is-active');
+                }
+                $('#hanabi-other-players').on(
+                    'click', '.hanabi-player-box',controller.handleHintModal
+                );
+                $('#give-hint-modal button.delete').click(closeHintModal);
+                $('#give-hint-modal .modal-background').click(closeHintModal);
+                $(document).keyup(function(key) {
+                    if(key.which === 27)
+                        closeHintModal();
+                });
             }
         );
     </script>
 </head>
 <body>
 <div id="loading-icon" style="display: none;"><span class="fas fa-pulse fa-spinner"></span></div>
+<div class="modal" id="give-hint-modal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">{% trans %}Give a hint{% endtrans %}</p>
+            <button class="delete" aria-label="{% trans %}close{% endtrans %}"></button>
+        </header>
+        <section class="modal-card-body has-text-centered">
+            <div class="hanabi-card-list"></div>
+        </section>
+    </div>
+</div>
 <section class="section" id="start-section">
     <div class="container">
         <h1 class="title is-1 has-text-centered is-centered">
