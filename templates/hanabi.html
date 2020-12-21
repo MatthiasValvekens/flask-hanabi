@@ -147,32 +147,32 @@
     <script type="text/javascript" src="/static/js/moment.js"></script>
     <script type="module">
         import * as hanabi from '/static/js/hanabi.js';
-        const controller = hanabi.hanabieController;
+        const controller = hanabi.hanabiController;
         hanabi.HANABI_CONFIG.apiBaseURL = "{{ api_base_url }}";
         /** @type {GUIStrings} */
         hanabi.HANABI_CONFIG.guiStrings = {
             statusString: function(status) {
                 switch(status) {
-                    case boggle.GameStatus.INITIAL:
+                    case hanabi.GameStatus.INITIAL:
                         return "{% trans %}Waiting for game to start...{% endtrans %}";
-                    case boggle.GameStatus.PRE_START:
-                        return "{% trans %}Round starting in a few moments...{% endtrans %}";
-                    case boggle.GameStatus.PLAYING:
-                        return "{% trans %}Round underway{% endtrans %}";
-                    case boggle.GameStatus.SCORING:
-                        return "{% trans %}Waiting for scores...{% endtrans %}";
-                    case boggle.GameStatus.SCORED:
+                    case hanabi.GameStatus.PLAYER_THINKING:
+                        return "{% trans %}Waiting for player to act...{% endtrans %}";
+                    case hanabi.GameStatus.TURN_END:
+                        return "{% trans %}Waiting for player to end turn...{% endtrans %}";
+                    case hanabi.GameStatus.GAME_OVER:
                         return "{% trans %}The results are in!{% endtrans %}";
                     default:
                         throw "No GUI string available";
                 }
-            }
+            },
+            cardPlayed: "{% trans %}Card played{% endtrans %}",
+            cardDiscarded: "{% trans %}Card discarded{% endtrans %}"
         };
         $(document).ready(
             function() {
-                controller.getOptions();
+                $('#spawn-session').click(controller.triggerSessionSpawn);
                 $('#join-session').click(controller.joinExistingSession);
-                $('#advance-round').click(controller.advanceRound);
+                $('#manager-start-game').click(controller.startGame);
                 $('#inv-token-display-copy').click(function () {
                         const invTokenField = document.getElementById("inv-token-display");
                         invTokenField.select();
@@ -234,16 +234,12 @@
             <div class="columns is-centered">
                 <div class="column is-half-desktop is-three-quarters-tablet is-full-mobile is-one-third-fullhd has-text-centered">
                     <h6 class="title is-4">{% trans %}Start new session{% endtrans %}</h6>
-                    <div class="field has-addons">
-                        <div class="control">
-                            <button id="spawn-session" class="button is-primary" disabled>
-                                <span>{% trans %}Start{% endtrans %}</span>
-                                <span class="icon is-small">
-                                    <span class="fas fa-chevron-right is-right"></span>
-                                </span>
-                            </button>
-                        </div>
-                    </div>
+                    <button id="spawn-session" class="button is-primary">
+                        <span>{% trans %}Start{% endtrans %}</span>
+                        <span class="icon is-small">
+                            <span class="fas fa-chevron-right is-right"></span>
+                        </span>
+                    </button>
                 </div>
             </div>
             <hr/>
@@ -264,8 +260,8 @@
                             <button id="join-session" class="button is-primary">
                                 <span>{% trans %}Start{% endtrans %}</span>
                                 <span class="icon is-small">
-                                            <span class="fas fa-chevron-right is-right"></span>
-                                        </span>
+                                    <span class="fas fa-chevron-right is-right"></span>
+                                </span>
                             </button>
                         </div>
                     </div>
@@ -274,9 +270,12 @@
         </div>
     </div>
 </section>
-<section class="section" id="game-section">
+<section class="section" id="game-section" style="display: none;">
     <div class="container">
         <h1 class="title is-1 has-text-centered">Hanabi</h1>
+
+        <h6 class="subtitle is-6 has-text-weight-bold" id="status-box">
+        </h6>
         <div class="box">
             <div class="columns">
                 <div class="column is-8 has-text-centered">
@@ -284,19 +283,16 @@
 
                     <div id="current-fireworks" class="hanabi-card-list">
                         <div class="hanabi-card hanabi-state hanabi-empty-slot" data-hanabi-col="0"></div>
-                        <div class="hanabi-card hanabi-state" data-hanabi-col="1" data-hanabi-num-value="3"><span>3</span></div>
-                        <div class="hanabi-card hanabi-state" data-hanabi-col="2" data-hanabi-num-value="5"><span>5</span></div>
-                        <div class="hanabi-card hanabi-state" data-hanabi-col="3" data-hanabi-num-value="2"><span>2</span></div>
-                        <div class="hanabi-card hanabi-state" data-hanabi-col="4" data-hanabi-num-value="1"><span>1</span></div>
+                        <div class="hanabi-card hanabi-state hanabi-empty-slot" data-hanabi-col="1"></div>
+                        <div class="hanabi-card hanabi-state hanabi-empty-slot" data-hanabi-col="2"></div>
+                        <div class="hanabi-card hanabi-state hanabi-empty-slot" data-hanabi-col="3"></div>
+                        <div class="hanabi-card hanabi-state hanabi-empty-slot" data-hanabi-col="4"></div>
                     </div>
                 </div>
                 <div class="column is-4">
                     <h6 class="has-text-weight-bold has-text-centered">Players</h6>
                     <div id="player-list">
                         <ul>
-                            <li data-player-id="1">TestPlayer1</li>
-                            <li data-player-id="2">TestPlayer2</li>
-                            <li data-player-id="3">TestPlayer3</li>
                         </ul>
                     </div>
                 </div>
@@ -318,37 +314,10 @@
                     </div>
                 </div>
                 <div class="column is-4 has-text-centered" id="side-panel">
-                    <!-- turn instructions go here -->
                 </div>
             </div>
         </div>
         <div class="tile is-ancestor" id="hanabi-other-players">
-            <div class="tile is-parent">
-                <div class="tile is-child box hanabi-player-box-container" data-player-id="2">
-                    <div class="hanabi-player-box">
-                        <p class="title is-6">TestPlayer2</p>
-                        <div class="hanabi-card-list">
-                            <div class="hanabi-card hanabi-state hanabi-empty-slot"></div>
-                            <div class="hanabi-card hanabi-state" data-hanabi-col="1" data-hanabi-num-value="3"><span>3</span></div>
-                            <div class="hanabi-card hanabi-state" data-hanabi-col="2" data-hanabi-num-value="5"><span>5</span></div>
-                            <div class="hanabi-card hanabi-state" data-hanabi-col="4" data-hanabi-num-value="1"><span>1</span></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="tile is-parent">
-                <div class="tile is-child box hanabi-player-box-container" data-player-id="3">
-                    <div class="hanabi-player-box active-player">
-                        <p class="title is-6">TestPlayer3</p>
-                        <div class="hanabi-card-list">
-                            <div class="hanabi-card hanabi-state" data-hanabi-col="3" data-hanabi-num-value="1"><span>1</span></div>
-                            <div class="hanabi-card hanabi-state" data-hanabi-col="2" data-hanabi-num-value="3"><span>3</span></div>
-                            <div class="hanabi-card hanabi-state hanabi-empty-slot"></div>
-                            <div class="hanabi-card hanabi-state" data-hanabi-col="4" data-hanabi-num-value="1"><span>1</span></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </section>
@@ -362,42 +331,23 @@
                         <div class="control is-expanded has-icons-left">
                             <input id="inv-token-display" class="input" type="text" readonly aria-label="{% trans %}invitation token{% endtrans %}">
                             <span class="icon is-small is-left">
-                                          <span class="fas fa-users"></span>
-                                    </span>
+                                  <span class="fas fa-users"></span>
+                            </span>
                             <p class="help">
                                 {% trans %}Invitation token: click to copy{% endtrans %}
                             </p>
                         </div>
                         <div class="control">
                             <button id="inv-token-display-copy" class="button is-light">
-                                        <span class="icon is-small">
-                                            <span class="fas fa-clipboard"></span>
-                                        </span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="field has-addons">
-                        <div class="control has-icons-left is-expanded">
-                            <input class="input" type="number" id="round-announce-countdown" value="{{ default_countdown }}" aria-label="{% trans %}countdown to next round{% endtrans %}">
-                            <span class="icon is-left is-small">
-                                        <span class="fas fa-stopwatch"></span>
-                                    </span>
-                            <p class="help">
-                                {% trans trimmed %}
-                                    Number of seconds until next game round.
-                                    If a round is currently underway, it will be suspended.
-                                {% endtrans %}
-                            </p>
-                        </div>
-                        <div class="control">
-                            <button class="button is-primary" id="advance-round">
-                                <span>{% trans %}Announce{% endtrans %}</span>
                                 <span class="icon is-small">
-                                            <span class="fas fa-chevron-right is-right"></span>
-                                        </span>
+                                    <span class="fas fa-clipboard"></span>
+                                </span>
                             </button>
                         </div>
                     </div>
+                    <button id="manager-start-game" class="button is-primary" disabled>
+                        {% trans %}Start game{% endtrans %}
+                    </button>
                 </div>
             </div>
         </div>

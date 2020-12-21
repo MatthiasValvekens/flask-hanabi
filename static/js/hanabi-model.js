@@ -79,10 +79,15 @@ export class PlayerContext {
 }
 
 /**
+ * @typedef {Object} HeldCard
+ * @property {int} colour
+ * @property {int} numValue
+ */
+
+/**
  * @typedef {Object} Player
  * @property {string} name
  * @property {int} playerId
- * @property {?string} hand
  */
 
 /**
@@ -208,13 +213,29 @@ function parseAction(serverPlayerAction) {
 }
 
 /**
+ * @typedef {Object} ServerCard
+ * @property {int} colour
+ * @property {int} num_value
+ */
+/**
+ * @typedef {Object} ServerPlayer
+ * @property {string} name
+ * @property {int} player_id
+ * @property {(?ServerCard)[]} hand
+ */
+
+/**
  * @typedef {Object} ServerGameState
  * @property {string} created - Time when session was created
- * @property {Player[]} players - List of players
+ * @property {ServerPlayer[]} players - List of players
  * @property {int} active_player - Currently active player
  * @property {int} status - State of the session
- * @property {int[]} current_fireworks - current state of the fireworks
- * @property {?ServerPlayerAction} last_action - action taken by current player
+ * @property {int} cards_in_hand - No. of cards that players are allowed to hold
+ * @property {int} errors_remaining - Errors remaining
+ * @property {int} tokens_remaining - Tokens remaining
+ * @property {int[]} current_fireworks - Current state of the fireworks
+ * @property {boolean[]} used_hand_slots - Used slots in player's hand
+ * @property {?ServerPlayerAction} last_action - Action taken by current player
  */
 
 /**
@@ -231,6 +252,12 @@ export class GameState {
         this._playerContext = playerContext;
         /** @type {Player[]} */
         this._playerList = [];
+
+        /**
+         * @type {Object.<int,(?HeldCard)[]>}
+         * @private
+         */
+        this._handsByPlayerId = Object();
         /** @type {int[]} */
         this._currentFireworks = [];
         /** @type {boolean[]} */
@@ -245,6 +272,9 @@ export class GameState {
         this._errorsRemaining = 0;
         /** @type {int} */
         this._tokensRemaining = 0;
+
+        /** @type {int} */
+        this._cardsInHand = 0;
     }
 
     /**
@@ -254,21 +284,32 @@ export class GameState {
      */
     updateState(serverUpdate) {
         let { status } = serverUpdate;
+        let handsByPlayerId = this._handsByPlayerId;
         const newPlayerList = serverUpdate.players.map(
-            ({name, player_id}) => (
-                /** @type {Player} */
-                {name: name, playerId: player_id}
-            )
+            function(serverPlayer) {
+                let {name, player_id} = serverPlayer
+                let result = {name: name, playerId: player_id};
+                // update the player's hands
+                if(serverPlayer.hand) {
+                    handsByPlayerId[player_id] = serverPlayer.hand.map(
+                        function(theCard) {
+                            if(theCard === null) {
+                                return null;
+                            } else {
+                                return {colour: theCard.colour, numValue: theCard.num_value};
+                            }
+                        }
+                    );
+                }
+                return result;
+
+            }
         );
         const oldIdSet = new Set(this._playerList.map(({playerId}) => playerId));
         const joining = newPlayerList.filter(({playerId}) => !oldIdSet.has(playerId));
         this._playerList = newPlayerList;
 
         let gameStateAdvanced = this._status !== status;
-        if(status !== GameStatus.INITIAL) {
-            this._currentFireworks = serverUpdate.current_fireworks;
-
-        }
         switch(status) {
             case GameStatus.INITIAL:
                 break;
@@ -276,7 +317,12 @@ export class GameState {
             case GameStatus.TURN_END:
                 this._currentAction = parseAction(serverUpdate.last_action);
             case GameStatus.PLAYER_THINKING:
+                this._currentFireworks = serverUpdate.current_fireworks;
+                this._slotsInUse = serverUpdate.used_hand_slots;
                 this._activePlayerId = serverUpdate.active_player;
+                this._errorsRemaining = serverUpdate.errors_remaining;
+                this._tokensRemaining = serverUpdate.tokens_remaining;
+                this._cardsInHand = serverUpdate.cards_in_hand;
 
         }
         this._status = status;
@@ -337,5 +383,31 @@ export class GameState {
      */
     get currentAction() {
         return this._currentAction;
+    }
+
+    /**
+     * @return {boolean[]}
+     */
+    get slotsInUse() {
+        return this._slotsInUse;
+    }
+
+    /**
+     * @return {int}
+     */
+    get numCardsInHand() {
+        return this._cardsInHand;
+    }
+
+    /**
+     * @param {int} playerId
+     * @return {(?HeldCard)[]}
+     */
+    cardsHeldBy(playerId) {
+        if(!this._handsByPlayerId.hasOwnProperty(playerId)) {
+            console.log(`Hand of ${playerId} not found`);
+            return [];
+        }
+        return this._handsByPlayerId[playerId];
     }
 }

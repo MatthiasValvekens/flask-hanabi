@@ -449,6 +449,7 @@ def session_state(session_id: int, calling_player: int = None):
     response['current_fireworks'] = query_fireworks_status(sess)
     response['errors_remaining'] = sess.errors_remaining
     response['tokens_remaining'] = sess.tokens_remaining
+    response['cards_in_hand'] = sess.cards_in_hand
 
     # tweak player json objects to include their hands,
     # unless called with calling_player None, which is the management API.
