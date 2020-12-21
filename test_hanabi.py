@@ -225,6 +225,7 @@ def test_play_one_unplayable_card(client):
     assert response.status_code == 200, response.get_json()
     rdata = response.get_json()
     assert rdata['current_fireworks'] == [0, 0, 0, 0, 0]
+    assert rdata['used_hand_slots'] == [True, False, True, True]
 
     # check from the other player's point of view
     response = client.get(gc2.play_url)
@@ -263,6 +264,7 @@ def test_discard_one_card(client):
     assert response.status_code == 200, response.get_json()
     rdata = response.get_json()
     assert rdata['current_fireworks'] == [0, 0, 0, 0, 0]
+    assert rdata['used_hand_slots'] == [True, False, True, True]
 
     # check from the other player's point of view
     response = client.get(gc2.play_url)

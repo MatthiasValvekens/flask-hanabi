@@ -6,13 +6,13 @@ import hmac
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 
 from babel import Locale
 
 from flask import Flask, abort, request, jsonify, render_template
 from flask_babel import Babel, get_locale, format_timedelta
-from sqlalchemy import UniqueConstraint, update, select, func, desc, and_, or_
+from sqlalchemy import UniqueConstraint, update, func, desc, and_, or_
 from flask_sqlalchemy import SQLAlchemy
 
 import random
@@ -454,9 +454,12 @@ def session_state(session_id: int, calling_player: int = None):
     # unless called with calling_player None, which is the management API.
     # The latter should only reveal the public parts of the game state
     if calling_player is not None:
-        hands = query_hands_for_others(sess, calling_player)
+        hands, calling_player_used_slots = query_hands_for_others(
+            sess, calling_player
+        )
         for player_id, player_json in player_json_objects.items():
             if player_id == calling_player:
+                response['used_hand_slots'] = calling_player_used_slots
                 continue
             player_json['hand'] = [
                 card.get_type().as_json() if card is not None else None
@@ -516,23 +519,26 @@ def query_fireworks_status(session: HanabiSession, for_update=False) \
 
 
 def query_hands_for_others(session: HanabiSession, player_id: int)\
-        -> Dict[int, List[Optional[HeldCard]]]:
-    hands_q = HeldCard.query.filter(
-        and_(
-            HeldCard.session_id == session.id,
-            HeldCard.player_id != player_id
-        )
-    )
+        -> Tuple[Dict[int, List[Optional[HeldCard]]], List[bool]]:
+    """
+    Query the hands of all players except the calling one.
+    For the latter, we only report on the card slots that are in use.
+    """
+    hands_q = HeldCard.query.filter(HeldCard.session_id == session.id)
+
+    calling_player_used_slots = [False] * session.cards_in_hand
     result = defaultdict(lambda: [None] * session.cards_in_hand)
     card: HeldCard
     for card in hands_q.all():
-        hand: list = result[card.player_id]
-        try:
+        if not (0 <= card.card_position < session.cards_in_hand):
+            raise GameStateError(f"Illegal card position: {card.card_position}")
+        if card.player_id == player_id:
+            calling_player_used_slots[card.card_position] = True
+        else:
+            hand: list = result[card.player_id]
             hand[card.card_position] = card
-        except IndexError as e:
-            raise GameStateError("Illegal card position", e)
 
-    return dict(result)
+    return dict(result), calling_player_used_slots
 
 
 def query_hand_for_current_player(session: HanabiSession, player_id,
