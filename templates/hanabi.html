@@ -182,7 +182,10 @@
             },
             cardPlayed: "{% trans %}Card played{% endtrans %}",
             cardDiscarded: "{% trans %}Card discarded{% endtrans %}",
-            itsYourTurn: "{% trans %}It's your turn!{% endtrans %}"
+            itsYourTurn: "{% trans %}It's your turn!{% endtrans %}",
+            playerUsedACard: "{% trans %}<b>%(player)s</b> successfully played a card.{% endtrans %}",
+            playerMadeAMistake: "{% trans %}<b>%(player)s</b> made a mistake.{% endtrans %}",
+            playerDiscardedACard: "{% trans %}<b>%(player)s</b> discarded a card.{% endtrans %}",
         };
         $(document).ready(
             function() {
@@ -371,7 +374,7 @@
                         <div class="hanabi-card hanabi-state"><span>?</span></div>
                         <div class="hanabi-card hanabi-state hanabi-card-highlighted"><span>?</span></div>
                     </div>
-                    <div id="player-hint-message">
+                    <div id="player-action-message">
                         These are all your <span class="hanabi-state" data-hanabi-col="0">green</span> cards.
                     </div>
                 </div>

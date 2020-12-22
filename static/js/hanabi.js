@@ -8,6 +8,9 @@ export {GameStatus} from './hanabi-model.js';
  * @property {string} cardPlayed
  * @property {string} cardDiscarded
  * @property {string} itsYourTurn
+ * @property {string} playerUsedACard
+ * @property {string} playerDiscardedACard
+ * @property {string} playerMadeAMistake
  */
 
 /**
@@ -23,6 +26,11 @@ export const HANABI_CONFIG = {
     heartbeatTimeout: 3000,
     guiStrings: null
 };
+
+export function pseudoPythonInterpolate(fmt, obj) {
+    // based on noice one-liner from here: https://code.djangoproject.com/ticket/4414
+    return fmt.replace(/%\(\w+\)s/g, function(match){return String(obj[match.slice(2,-2)])});
+}
 
 export const hanabiController = function () {
     const GameStatus = hanabiModel.GameStatus;
@@ -269,15 +277,28 @@ export const hanabiController = function () {
                 }
                 let action = gameState.currentAction;
                 if(action !== null && action.actionType !== ActionType.HINT) {
-                    /** @type {string} */
-                    let title;
-                    if(action.actionType === ActionType.PLAY) {
+                    let cardAction = action.action;
+                    let title, actionSummaryFmt;
+                    if(cardAction.wasPlay) {
                         title = HANABI_CONFIG.guiStrings.cardPlayed;
+                        if(cardAction.wasError) {
+                            actionSummaryFmt = HANABI_CONFIG.guiStrings.playerMadeAMistake;
+                        } else {
+                            actionSummaryFmt = HANABI_CONFIG.guiStrings.playerUsedACard;
+                        }
                     } else {
                         title = HANABI_CONFIG.guiStrings.cardDiscarded;
+                        actionSummaryFmt = HANABI_CONFIG.guiStrings.playerDiscardedACard;
                     }
                     setSidePanelCard(
                         title, action.action.colour, action.action.numValue
+                    );
+                    $('#player-action-message').html(
+                        pseudoPythonInterpolate(
+                            actionSummaryFmt, {
+                                player: gameState.playerName(gameState.activePlayerId)
+                            }
+                        )
                     );
                 } else {
                     // TODO render hint
@@ -285,6 +306,7 @@ export const hanabiController = function () {
 
                     // These are all your <span class="hanabi-state" data-hanabi-col="0">green</span> cards.
                     clearSidePanelCard();
+                    $('#player-action-message').text('');
                 }
             }
 
