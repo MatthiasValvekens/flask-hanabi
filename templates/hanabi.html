@@ -142,6 +142,11 @@
             text-transform:uppercase;
             vertical-align:top
         }
+
+        .table.is-centered {
+            margin-left: auto;
+            margin-right: auto;
+        }
     </style>
     <script type="text/javascript" src="/static/js/jquery.min.js"></script>
     <script type="text/javascript" src="/static/js/moment.js"></script>
@@ -149,8 +154,18 @@
         import * as hanabi from '/static/js/hanabi.js';
         const controller = hanabi.hanabiController;
         hanabi.HANABI_CONFIG.apiBaseURL = "{{ api_base_url }}";
-        /** @type {GUIStrings} */
+        /**
+         * GUI strings that need to be translated via gettext
+         * @type {GUIStrings}
+         * */
         hanabi.HANABI_CONFIG.guiStrings = {
+            colourNames: [
+                "{% trans %}green{% endtrans %}",
+                "{% trans %}red{% endtrans %}",
+                "{% trans %}orange{% endtrans %}",
+                "{% trans %}purple{% endtrans %}",
+                "{% trans %}blue{% endtrans %}",
+            ],
             statusString: function(status) {
                 switch(status) {
                     case hanabi.GameStatus.INITIAL:
@@ -176,6 +191,7 @@
                 $('#manager-start-game').click(controller.startGame);
                 $('#discard-button').click(controller.executeDiscardAction);
                 $('#play-card-button').click(controller.executePlayAction);
+                $('#end-turn-button').click(controller.endTurn);
                 $('#inv-token-display-copy').click(function () {
                         const invTokenField = document.getElementById("inv-token-display");
                         invTokenField.select();
@@ -228,7 +244,7 @@
     <div class="modal-background"></div>
     <div class="modal-card">
         <header class="modal-card-head">
-            <p class="modal-card-title">{% trans %}Give a hint?{% endtrans %}</p>
+            <p class="modal-card-title">{% trans %}Give a hint to <span id="hint-recipient"></span>?{% endtrans %}</p>
             <button class="delete" aria-label="{% trans %}close{% endtrans %}"></button>
         </header>
         <section class="modal-card-body has-text-centered">
@@ -245,9 +261,9 @@
         <div class="dropdown is-hoverable" id="lang-select-container">
             <div class="dropdown-trigger">
                 <button class="button" aria-haspopup="true" aria-controls="lang-select-dropdown">
-                            <span class="icon is-small has-text-grey-light">
-                                <span class="fas fa-language"></span>
-                            </span>
+                        <span class="icon is-small has-text-grey-light">
+                            <span class="fas fa-language"></span>
+                        </span>
                     <span>{{ active_locale.display_name }}</span>
                 </button>
             </div>
@@ -360,6 +376,28 @@
                     </div>
                 </div>
                 <div class="column is-4 has-text-centered" id="side-panel">
+                    <p class="subtitle" style="visibility: hidden">
+
+                    </p>
+                    <div id="side-panel-card">
+                        <div class="hanabi-card hanabi-state hanabi-empty-slot"></div>
+                    </div>
+                    <button id="end-turn-button" class="button is-primary" style="visibility: hidden">
+                        <span>{% trans %}End turn{% endtrans %}</span>
+                        <span class="icon is-small">
+                            <span class="fas fa-fast-forward is-right"></span>
+                        </span>
+                    </button>
+                    <table class="table is-centered">
+                        <tr>
+                            <td>{% trans %}Mistakes left{% endtrans %}</td>
+                            <td id="errors-left">0</td>
+                        </tr>
+                        <tr>
+                            <td>{% trans %}Tokens left{% endtrans %}</td>
+                            <td id="tokens-left">0</td>
+                        </tr>
+                    </table>
                 </div>
             </div>
         </div>

@@ -4,6 +4,7 @@ export {GameStatus} from './hanabi-model.js';
 /**
  * @typedef GUIStrings
  * @property {function} statusString - Return status text for the given round state
+ * @property {string[]} colourNames
  * @property {string} cardPlayed
  * @property {string} cardDiscarded
  * @property {string} itsYourTurn
@@ -243,27 +244,31 @@ export const hanabiController = function () {
             // update status box
             let statusString = HANABI_CONFIG.guiStrings.statusString(status);
 
-            if(status !== GameStatus.INITIAL) {
-                updateFireworks();
-                updatePlayerHands();
-            }
-            // FIXME there are still bugs here
             if(gameStateUpdate.activePlayerChanged) {
-                $('#side-panel').html('');
                 $('.hanabi-player-box.active-player').removeClass('active-player');
-                if(gameState.activePlayerId !== playerContext().playerId) {
+                if(gameState.isCurrentlyActive) {
+                    statusString = HANABI_CONFIG.guiStrings.itsYourTurn;
+                } else {
                     let filter = `[data-player-id="${gameState.activePlayerId}"]`;
                     $(`#hanabi-other-players .hanabi-player-box${filter}`).addClass("active-player");
-                } else {
-                    statusString = HANABI_CONFIG.guiStrings.itsYourTurn;
                 }
             }
-            $('#status-box').text(statusString);
-            let action = gameState.currentAction;
-            if(status === GameStatus.TURN_END && action !== null) {
-                if(action.actionType === ActionType.HINT) {
-                    // TODO render hint
+            if(gameStateUpdate.gameStateAdvanced) {
+                $('#status-box').text(statusString);
+                if(status !== GameStatus.INITIAL) {
+                    updateFireworks();
+                    updatePlayerHands();
+                    updateCounters();
+                }
+                if(status === GameStatus.TURN_END && gameState.isCurrentlyActive) {
+                    $('#end-turn-button').css('visibility', 'visible')
+                        .prop('disabled', false);
                 } else {
+                    $('#end-turn-button').css('visibility', 'hidden')
+                        .prop('disabled', true);
+                }
+                let action = gameState.currentAction;
+                if(action !== null && action.actionType !== ActionType.HINT) {
                     /** @type {string} */
                     let title;
                     if(action.actionType === ActionType.PLAY) {
@@ -271,9 +276,15 @@ export const hanabiController = function () {
                     } else {
                         title = HANABI_CONFIG.guiStrings.cardDiscarded;
                     }
-                    setSidePanel(
+                    setSidePanelCard(
                         title, action.action.colour, action.action.numValue
                     );
+                } else {
+                    // TODO render hint
+                    // card highlighting is taken care of by updatePlayerHands()
+
+                    // These are all your <span class="hanabi-state" data-hanabi-col="0">green</span> cards.
+                    clearSidePanelCard();
                 }
             }
 
@@ -317,10 +328,14 @@ export const hanabiController = function () {
      * @param {int} colour
      * @param {int} value
      */
-    function setSidePanel(title, colour, value) {
-        $('#side-panel').html(
-            `<p class="subtitle">${title}</p>${formatCard(colour, value, true)}`
-        );
+    function setSidePanelCard(title, colour, value) {
+        $('#side-panel p.subtitle').text(title).css('visibility', 'visible');
+        $('#side-panel-card').html(formatCard(colour, value, true));
+    }
+
+    function clearSidePanelCard() {
+        $('#side-panel p.subtitle').css('visibility', 'hidden');
+        $('#side-panel-card').html(emptySlot);
     }
 
     /**
@@ -336,6 +351,13 @@ export const hanabiController = function () {
             </div>`
     }
 
+    function updateCounters() {
+        $('#errors-left').text(gameState.errorsRemaining);
+        $('#tokens-left').text(gameState.tokensRemaining);
+        if(gameState.tokensRemaining === 0) {
+            $('#discard-button').prop('disabled', true);
+        }
+    }
 
     function updateFireworks() {
         $('#current-fireworks .hanabi-card').each(function (i) {
@@ -407,6 +429,8 @@ export const hanabiController = function () {
         if(gameState.isCurrentlyActive && gameState.status === GameStatus.PLAYER_THINKING) {
             const hintModal = $('#give-hint-modal');
             const theId = $(this).attr('data-player-id');
+            const name = gameState.playerName(theId);
+            $('#hint-recipient').text(name);
             hintModal.find('.hanabi-card-list').html(renderHandOfPlayer(theId, false));
             hintModal.addClass('is-active');
         }
@@ -436,11 +460,19 @@ export const hanabiController = function () {
         );
     }
 
+    function endTurn() {
+        callHanabiApi(
+            'post', playerContext().playEndpoint + '/advance', {},
+            forceRefresh
+        );
+    }
+
     return {
         joinExistingSession: joinExistingSession,
         triggerSessionSpawn: triggerSessionSpawn, startGame: startGame,
         handleHintModal: handleHintModal, handleCardPlay: handleCardPlay,
         executePlayAction: (() => executeCardAction(false)),
         executeDiscardAction: (() => executeCardAction(true)),
+        endTurn: endTurn
     }
 }();

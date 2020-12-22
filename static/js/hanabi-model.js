@@ -7,9 +7,6 @@ export const ActionType = Object.freeze({
     HINT: 'HINT', PLAY: 'PLAY', DISCARD: 'DISCARD'
 });
 
-export const colourNames = [
-    "green", "red", "orange", "purple", "blue"
-];
 export const colourValues = [
     "#048304", "#b52d30",
     "#cb761a", "#cb1ac8",
@@ -260,6 +257,11 @@ export class GameState {
          * @private
          */
         this._handsByPlayerId = Object();
+        /**
+         * @type {Object.<int,string>}
+         * @private
+         */
+        this._playerNamesById = Object();
         /** @type {int[]} */
         this._currentFireworks = [];
         /** @type {boolean[]} */
@@ -287,11 +289,13 @@ export class GameState {
     updateState(serverUpdate) {
         let { status } = serverUpdate;
         let handsByPlayerId = this._handsByPlayerId;
+        let playerNamesById = this._playerNamesById;
         const newPlayerList = serverUpdate.players.map(
             function(serverPlayer) {
                 let {name, player_id} = serverPlayer
                 let result = {name: name, playerId: player_id};
-                // update the player's hands
+                // update the player's hands & name cache
+                playerNamesById[player_id] = name;
                 if(serverPlayer.hand) {
                     handsByPlayerId[player_id] = serverPlayer.hand.map(
                         function(theCard) {
@@ -313,23 +317,21 @@ export class GameState {
 
         let gameStateAdvanced = this._status !== status;
         let activePlayerChanged = false;
-        switch(status) {
-            case GameStatus.INITIAL:
-                break;
-            case GameStatus.GAME_OVER:
-            case GameStatus.TURN_END:
-                this._currentAction = parseAction(serverUpdate.last_action);
-            case GameStatus.PLAYER_THINKING:
-                this._currentFireworks = serverUpdate.current_fireworks;
-                this._slotsInUse = serverUpdate.used_hand_slots;
-                if(this._activePlayerId !== serverUpdate.active_player) {
-                    activePlayerChanged = true;
-                    this._activePlayerId = serverUpdate.active_player;
-                }
-                this._errorsRemaining = serverUpdate.errors_remaining;
-                this._tokensRemaining = serverUpdate.tokens_remaining;
-                this._cardsInHand = serverUpdate.cards_in_hand;
-
+        if(status !== GameStatus.INITIAL) {
+            this._slotsInUse = serverUpdate.used_hand_slots;
+            if(this._activePlayerId !== serverUpdate.active_player) {
+                activePlayerChanged = true;
+                this._activePlayerId = serverUpdate.active_player;
+            }
+            this._errorsRemaining = serverUpdate.errors_remaining;
+            this._tokensRemaining = serverUpdate.tokens_remaining;
+            this._cardsInHand = serverUpdate.cards_in_hand;
+            this._currentFireworks = serverUpdate.current_fireworks;
+        }
+        if(status === GameStatus.TURN_END) {
+            this._currentAction = parseAction(serverUpdate.last_action);
+        } else {
+            this._currentAction = null;
         }
         this._status = status;
         return {
@@ -418,5 +420,13 @@ export class GameState {
             return [];
         }
         return this._handsByPlayerId[playerId];
+    }
+
+    playerName(playerId) {
+        if(!this._playerNamesById.hasOwnProperty(playerId)) {
+            console.log(`Name of ${playerId} not found`);
+            return `Player #${playerId}`;
+        }
+        return this._playerNamesById[playerId];
     }
 }
