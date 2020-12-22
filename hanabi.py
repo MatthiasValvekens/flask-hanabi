@@ -1043,7 +1043,7 @@ def _get_int_or_none(json: dict, key):
     if val is not None:
         try:
             val = int(val)
-        except ValueError:
+        except (TypeError, ValueError):
             return abort(400, f"Improper value for {key}")
     return val
 
@@ -1066,7 +1066,7 @@ def play(session_id, pepper, player_id, player_token):
         return abort(400, description="No request data")
     try:
         action_type = ActionType(request_data['type'])
-    except (KeyError, ValueError):
+    except (TypeError, KeyError, ValueError):
         return abort(400, description="Improper action type specification.")
 
     colour = _get_int_or_none(request_data, 'colour')
@@ -1075,7 +1075,7 @@ def play(session_id, pepper, player_id, player_token):
     if action_type == ActionType.HINT:
         try:
             hint_target = int(request_data['hint_target'])
-        except (KeyError, ValueError):
+        except (TypeError, KeyError, ValueError):
             return abort(400, description="Improper hint_target specification.")
 
         give_hint(

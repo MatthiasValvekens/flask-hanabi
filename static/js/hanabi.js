@@ -1,4 +1,5 @@
 import * as hanabiModel from './hanabi-model.js';
+
 export {GameStatus} from './hanabi-model.js';
 
 /**
@@ -493,7 +494,8 @@ export const hanabiController = function () {
     function handleHintModal() {
         if(gameState.isCurrentlyActive && gameState.status === GameStatus.PLAYER_THINKING) {
             const hintModal = $('#give-hint-modal');
-            const theId = $(this).attr('data-player-id');
+            const theId = parseInt($(this).attr('data-player-id'));
+            hintModal.attr('data-target-id', theId);
             const name = gameState.playerName(theId);
             $('#hint-recipient').text(name);
             hintModal.find('.hanabi-card-list').html(renderHandOfPlayer(theId, false));
@@ -525,6 +527,19 @@ export const hanabiController = function () {
         );
     }
 
+    function submitHint(isColourHint) {
+        const giveHintModal = $('#give-hint-modal');
+        const targetId = parseInt(giveHintModal.attr('data-target-id'));
+        giveHintModal.removeClass('is-active');
+        let hintData = {type: ActionType.HINT, hint_target: targetId};
+        hintData[isColourHint ? 'colour' : 'num_value'] = parseInt($('#hint-input').val());
+        callHanabiApi(
+            'post', playerContext().playEndpoint, hintData,
+            forceRefresh
+        );
+
+    }
+
     function endTurn() {
         callHanabiApi(
             'post', playerContext().playEndpoint + '/advance', {},
@@ -538,6 +553,8 @@ export const hanabiController = function () {
         handleHintModal: handleHintModal, handleCardPlay: handleCardPlay,
         executePlayAction: (() => executeCardAction(false)),
         executeDiscardAction: (() => executeCardAction(true)),
+        submitNumValueHint: (() => submitHint(false)),
+        submitColourHint: (() => submitHint(true)),
         endTurn: endTurn
     }
 }();
