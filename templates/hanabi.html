@@ -110,7 +110,7 @@
             text-align: center;
         }
 
-        #hanabi-other-players .hanabi-card-list {
+        #hanabi-other-players .hanabi-card-list, .hanabi-card-list.hint-buttons  {
             font-size: 50%;
         }
 
@@ -195,8 +195,11 @@
                 $('#manager-start-game').click(controller.startGame);
                 $('#discard-button').click(controller.executeDiscardAction);
                 $('#play-card-button').click(controller.executePlayAction);
-                $('#colour-hint-button').click(controller.submitColourHint);
-                $('#num-value-hint-button').click(controller.submitNumValueHint);
+                $('#hint-submit').click(controller.submitHint);
+                $('#hint-selection').on(
+                    'click', '.hint-buttons .hanabi-card',
+                    controller.updateHintUI
+                )
                 $('#end-turn-button').click(controller.endTurn);
                 $('#inv-token-display-copy').click(function () {
                         const invTokenField = document.getElementById("inv-token-display");
@@ -246,7 +249,7 @@
         </section>
     </div>
 </div>
-<div class="modal" id="give-hint-modal" data-target-id="">
+<div class="modal" id="give-hint-modal">
     <div class="modal-background"></div>
     <div class="modal-card">
         <header class="modal-card-head">
@@ -254,27 +257,32 @@
             <button class="delete" aria-label="{% trans %}close{% endtrans %}"></button>
         </header>
         <section class="modal-card-body has-text-centered">
-            <div class="hanabi-card-list"></div>
-            <table class="table is-centered">
+            <div class="hanabi-card-list" id="hint-recipient-cards"></div>
+            <table class="table is-centered" id="hint-selection">
                 <tr>
-                    <td>{% trans %}Mark all cards of this colour{% endtrans %}</td>
-                    <td>
-                        <!-- TODO placeholder -->
-                        <input type="number" id="hint-input">
-                        <button id="colour-hint-button" class="button is-primary">
-                            {% trans %}Give hint{% endtrans %}
-                        </button>
+                    <td>{% trans %}Colour hint{% endtrans %}</td>
+                    <td class="hanabi-card-list hint-buttons">
+                        <div class="hanabi-card hanabi-state" data-hanabi-col="0"><span>?</span></div>
+                        <div class="hanabi-card hanabi-state" data-hanabi-col="1"><span>?</span></div>
+                        <div class="hanabi-card hanabi-state" data-hanabi-col="2"><span>?</span></div>
+                        <div class="hanabi-card hanabi-state" data-hanabi-col="3"><span>?</span></div>
+                        <div class="hanabi-card hanabi-state" data-hanabi-col="4"><span>?</span></div>
                     </td>
                 </tr>
                 <tr>
-                    <td>{% trans %}Mark all cards with this value{% endtrans %}</td>
-                    <td>
-                        <button id="num-value-hint-button" class="button is-primary">
-                            {% trans %}Give hint{% endtrans %}
-                        </button>
+                    <td>{% trans %}Value hint{% endtrans %}</td>
+                    <td class="hanabi-card-list hint-buttons">
+                        <div class="hanabi-card hanabi-state" data-hanabi-num-value="1"><span>1</span></div>
+                        <div class="hanabi-card hanabi-state" data-hanabi-num-value="2"><span>2</span></div>
+                        <div class="hanabi-card hanabi-state" data-hanabi-num-value="3"><span>3</span></div>
+                        <div class="hanabi-card hanabi-state" data-hanabi-num-value="4"><span>4</span></div>
+                        <div class="hanabi-card hanabi-state" data-hanabi-num-value="5"><span>5</span></div>
                     </td>
                 </tr>
             </table>
+            <button id="hint-submit" class="button is-primary" data-hint-value="" data-hint-type=""  data-target-id="" disabled>
+                {% trans %}Give hint{% endtrans %}
+            </button>
         </section>
         {# TODO add widgets to select a hint #}
     </div>

@@ -442,21 +442,31 @@ export const hanabiController = function () {
      * @return {string}
      */
     function renderHandOfPlayer(theId, processHighlights) {
-        return gameState.cardsHeldBy(theId).map(
+        let highlights = null;
+        if(processHighlights) {
+            let act = gameState.currentAction;
+            // highlight if the card is targeted by a hint
+            if(act && act.actionType === ActionType.HINT && act.action.targetPlayer === theId) {
+                highlights = act.action.positions;
+            }
+        }
+        return renderHandWithHighlight(gameState.cardsHeldBy(theId), highlights);
+    }
+
+    /**
+     * @param {HeldCard[]} hand
+     * @param {?int[]} highlights
+     * @return {string}
+     */
+    function renderHandWithHighlight(hand, highlights) {
+        return hand.map(
             function(card, index) {
-                let highlight = false;
-                if(processHighlights) {
-                    let act = gameState.currentAction;
-                    // highlight if the card is targeted by a hint
-                    highlight = act && act.actionType === ActionType.HINT
-                        && act.action.targetPlayer === theId
-                        && act.action.positions.includes(index);
-                }
+                let highlightThis = highlights && highlights.includes(index);
                 if(card === null) {
                     return emptySlot;
                 } else {
                     let {colour, numValue} = card;
-                    return formatCard(colour, numValue, highlight);
+                    return formatCard(colour, numValue, highlightThis);
                 }
             }
         ).join('');
@@ -495,10 +505,10 @@ export const hanabiController = function () {
         if(gameState.isCurrentlyActive && gameState.status === GameStatus.PLAYER_THINKING) {
             const hintModal = $('#give-hint-modal');
             const theId = parseInt($(this).attr('data-player-id'));
-            hintModal.attr('data-target-id', theId);
+            $('#hint-submit').attr('data-target-id', theId);
             const name = gameState.playerName(theId);
             $('#hint-recipient').text(name);
-            hintModal.find('.hanabi-card-list').html(renderHandOfPlayer(theId, false));
+            hintModal.find('#hint-recipient-cards').html(renderHandOfPlayer(theId, false));
             hintModal.addClass('is-active');
         }
     }
@@ -527,12 +537,54 @@ export const hanabiController = function () {
         );
     }
 
-    function submitHint(isColourHint) {
-        const giveHintModal = $('#give-hint-modal');
-        const targetId = parseInt(giveHintModal.attr('data-target-id'));
-        giveHintModal.removeClass('is-active');
+    function updateHintUI() {
+        const hintSubmit = $('#hint-submit');
+        const clicked = $(this);
+        let hintValue, hintType;
+        $('#hint-selection .hanabi-card').removeClass('hanabi-card-highlighted');
+        if(clicked.attr('data-hanabi-col')) {
+            hintValue = parseInt(clicked.attr('data-hanabi-col'));
+            hintType = "colour";
+        } else if(clicked.attr('data-hanabi-num-value')) {
+            hintValue = parseInt(clicked.attr('data-hanabi-num-value'));
+            hintType = "num_value";
+        } else {
+            hintSubmit.prop('disabled', false);
+            return;
+        }
+
+        clicked.addClass('hanabi-card-highlighted')
+
+        // highlight cards in #hint-recipient-cards
+        const targetId = parseInt(hintSubmit.attr('data-target-id'));
+        const hand = gameState.cardsHeldBy(targetId);
+        const recipientCards = $('#hint-recipient-cards').children();
+        recipientCards.removeClass('hanabi-card-highlighted');
+        hand.forEach(function(card, ix) {
+            let matches = (hintType === "colour" && card.colour === hintValue)
+                          || (hintType === "num_value" && card.numValue === hintValue);
+            if(matches) {
+                recipientCards.eq(ix).addClass('hanabi-card-highlighted');
+            }
+        });
+
+        hintSubmit.attr('data-hint-value', hintValue);
+        hintSubmit.attr('data-hint-type',  hintType);
+        hintSubmit.prop('disabled', false);
+    }
+
+    function submitHint() {
+        const clicked = $(this);
+        const hintType = clicked.attr('data-hint-type');
+        if(!hintType || (hintType !== "colour" && hintType !== "num_value")) {
+            throw "Invalid hintType";
+        }
+        const targetId = parseInt(clicked.attr('data-target-id'));
+        const hintValue = parseInt(clicked.attr('data-hint-value'));
+        $('#give-hint-modal').removeClass('is-active');
+        $('#hint-submit').prop('disabled', true);
         let hintData = {type: ActionType.HINT, hint_target: targetId};
-        hintData[isColourHint ? 'colour' : 'num_value'] = parseInt($('#hint-input').val());
+        hintData[hintType] = hintValue;
         callHanabiApi(
             'post', playerContext().playEndpoint, hintData,
             forceRefresh
@@ -553,8 +605,7 @@ export const hanabiController = function () {
         handleHintModal: handleHintModal, handleCardPlay: handleCardPlay,
         executePlayAction: (() => executeCardAction(false)),
         executeDiscardAction: (() => executeCardAction(true)),
-        submitNumValueHint: (() => submitHint(false)),
-        submitColourHint: (() => submitHint(true)),
-        endTurn: endTurn
+        endTurn: endTurn, updateHintUI: updateHintUI,
+        submitHint: submitHint
     }
 }();
