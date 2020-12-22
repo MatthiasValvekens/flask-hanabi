@@ -149,7 +149,6 @@
         }
     </style>
     <script type="text/javascript" src="/static/js/jquery.min.js"></script>
-    <script type="text/javascript" src="/static/js/moment.js"></script>
     <script type="module">
         import * as hanabi from '/static/js/hanabi.js';
         const controller = hanabi.hanabiController;
@@ -185,8 +184,13 @@
             itsYourTurn: "{% trans %}It's your turn!{% endtrans %}",
             playerUsedACard: "{% trans %}<b>%(player)s</b> successfully played a card.{% endtrans %}",
             playerMadeAMistake: "{% trans %}<b>%(player)s</b> made a mistake.{% endtrans %}",
+            mistakeDescription: "{% trans %}The <span style=\"color: %(colourHex)s\">%(colourName)s %(numValue)s</span> disturbs the flow of the firework show. Oh no!{% endtrans %}",
+            successDescription: "{% trans %}The <span style=\"color: %(colourHex)s\">%(colourName)s %(numValue)s</span> lights up the night sky!{% endtrans %}",
             playerDiscardedACard: "{% trans %}<b>%(player)s</b> discarded a card.{% endtrans %}",
-            playerGaveAHint: "{% trans %}<b>%(playerFrom)s</b> gave a hint to <b>%(playerTo)s</b>{% endtrans %}"
+            playerGaveAHint: "{% trans %}<b>%(playerFrom)s</b> gave a hint to <b>%(playerTo)s</b>{% endtrans %}",
+            markedCardsOfColour: "{% trans %}These are your <span style=\"color: %(colourHex)s\">%(colourName)s</span> cards.{% endtrans %}",
+            markedCardsOfValue: "{% trans %}These are your cards with value <b>%(numValue)s</b>.{% endtrans %}",
+            playerStandby: "{% trans %}Standing by...{% endtrans %}",
         };
         $(document).ready(
             function() {
@@ -199,7 +203,7 @@
                 $('#hint-selection').on(
                     'click', '.hint-buttons .hanabi-card',
                     controller.updateHintUI
-                )
+                );
                 $('#end-turn-button').click(controller.endTurn);
                 $('#inv-token-display-copy').click(function () {
                         const invTokenField = document.getElementById("inv-token-display");
@@ -244,6 +248,22 @@
             <button class="delete" aria-label="{% trans %}close{% endtrans %}"></button>
         </header>
         <section class="modal-card-body has-text-centered">
+            <p>
+                {% trans %}
+                    Would you like to play or discard this card?
+                    Discarding costs 1 token.
+                {% endtrans %}
+            </p>
+            <table class="table is-centered">
+                <tr>
+                    <td>{% trans %}Penalties left{% endtrans %}</td>
+                    <td class="errors-left">0</td>
+                </tr>
+                <tr>
+                    <td>{% trans %}Tokens left{% endtrans %}</td>
+                    <td class="tokens-left">0</td>
+                </tr>
+            </table>
             <button class="button is-primary" id="play-card-button">{% trans %}Play card{% endtrans %}</button>
             <button class="button is-danger" id="discard-button">{% trans %}Discard{% endtrans %}</button>
         </section>
@@ -375,8 +395,9 @@
         <div class="box">
             <div class="columns">
                 <div class="column is-8 has-text-centered">
-                    <h6 class="has-text-weight-bold">Current fireworks</h6>
+                    <h6 class="has-text-weight-bold">{% trans %}Current fireworks{% endtrans %}</h6>
 
+                    <p>{% trans %}This is the current status of the firework show.{% endtrans %}</p>
                     <div id="current-fireworks" class="hanabi-card-list">
                         <div class="hanabi-card hanabi-state hanabi-empty-slot" data-hanabi-col="0"></div>
                         <div class="hanabi-card hanabi-state hanabi-empty-slot" data-hanabi-col="1"></div>
@@ -397,16 +418,25 @@
             <div class="columns">
 
                 <div class="column is-8 has-text-centered">
-                    <h6 class="has-text-weight-bold has-text-centered">Your hand</h6>
-
+                    <h6 class="has-text-weight-bold has-text-centered">{% trans %}Your hand{% endtrans %}</h6>
+                    <p>
+                        {% trans %}
+                        This is your hand. You're not allowed to see your own cards, so you'll have to rely on
+                            other player's hints for information!
+                        {% endtrans %}
+                    </p>
+                    <p class="only-when-active has-text-weight-bold" style="visibility: hidden">
+                        {% trans %}
+                            Click one of the cards below to play or discard it.
+                        {% endtrans %}
+                    </p>
                     <div id="player-hand" class="hanabi-card-list">
                         <div class="hanabi-card hanabi-state hanabi-empty-slot"></div>
-                        <div class="hanabi-card hanabi-state hanabi-card-highlighted"><span>?</span></div>
-                        <div class="hanabi-card hanabi-state"><span>?</span></div>
-                        <div class="hanabi-card hanabi-state hanabi-card-highlighted"><span>?</span></div>
+                        <div class="hanabi-card hanabi-state hanabi-empty-slot"></div>
+                        <div class="hanabi-card hanabi-state hanabi-empty-slot"></div>
+                        <div class="hanabi-card hanabi-state hanabi-empty-slot"></div>
                     </div>
                     <div id="player-action-message">
-                        These are all your <span class="hanabi-state" data-hanabi-col="0">green</span> cards.
                     </div>
                 </div>
                 <div class="column is-4 has-text-centered" id="side-panel">
@@ -425,16 +455,22 @@
                     <table class="table is-centered">
                         <tr>
                             <td>{% trans %}Mistakes left{% endtrans %}</td>
-                            <td id="errors-left">0</td>
+                            <td class="errors-left">0</td>
                         </tr>
                         <tr>
                             <td>{% trans %}Tokens left{% endtrans %}</td>
-                            <td id="tokens-left">0</td>
+                            <td class="tokens-left">0</td>
                         </tr>
                     </table>
                 </div>
             </div>
         </div>
+
+        <p class="only-when-active has-text-centered has-text-weight-bold" style="visibility: hidden">
+            {% trans %}
+                Click on a player's hand to give them a hint.
+            {% endtrans %}
+        </p>
         <div class="tile is-ancestor" id="hanabi-other-players">
         </div>
     </div>

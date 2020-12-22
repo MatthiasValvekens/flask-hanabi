@@ -1,4 +1,5 @@
 import * as hanabiModel from './hanabi-model.js';
+import {colourValues} from "./hanabi-model.js";
 
 export {GameStatus} from './hanabi-model.js';
 
@@ -14,6 +15,11 @@ export {GameStatus} from './hanabi-model.js';
  * @property {string} playerMadeAMistake
  * @property {string} sidePanelHint
  * @property {string} playerGaveAHint
+ * @property {string} playerStandby
+ * @property {string} markedCardsOfColour
+ * @property {string} markedCardsOfValue
+ * @property {string} mistakeDescription
+ * @property {string} successDescription
  */
 
 /**
@@ -63,6 +69,7 @@ export const hanabiController = function () {
             <div class="tile is-child box hanabi-player-box" data-player-id="${player.playerId}">
                 <div>
                     <p class="title is-6">${player.name}</p>
+                    <p class="standby-message has-text-weight-light">${HANABI_CONFIG.guiStrings.playerStandby}</p>
                     <div class="hanabi-card-list">
                     </div>
                 </div>
@@ -259,14 +266,17 @@ export const hanabiController = function () {
                 $('.hanabi-player-box.active-player').removeClass('active-player');
                 if(gameState.isCurrentlyActive) {
                     statusString = HANABI_CONFIG.guiStrings.itsYourTurn;
+                    $('.only-when-active').css('visibility', 'visible');
                 } else {
                     let filter = `[data-player-id="${gameState.activePlayerId}"]`;
                     $(`#hanabi-other-players .hanabi-player-box${filter}`).addClass("active-player");
+                    $('.only-when-active').css('visibility', 'hidden');
                 }
             }
             if(gameStateUpdate.gameStateAdvanced) {
                 $('#status-box').text(statusString);
                 if(status !== GameStatus.INITIAL) {
+                    $('.standby-message').remove();
                     updateFireworks();
                     updatePlayerHands();
                     updateCounters();
@@ -339,12 +349,24 @@ export const hanabiController = function () {
      */
     function processCardAction(cardAction) {
         let title, actionSummaryFmt;
+        let flavourText = "";
         if(cardAction.wasPlay) {
             title = HANABI_CONFIG.guiStrings.cardPlayed;
+            let flavourArgs = {
+                colourName: HANABI_CONFIG.guiStrings.colourNames[cardAction.colour],
+                colourHex: colourValues[cardAction.colour],
+                numValue: cardAction.numValue
+            }
             if(cardAction.wasError) {
                 actionSummaryFmt = HANABI_CONFIG.guiStrings.playerMadeAMistake;
+                flavourText = pseudoPythonInterpolate(
+                    HANABI_CONFIG.guiStrings.mistakeDescription, flavourArgs
+                );
             } else {
                 actionSummaryFmt = HANABI_CONFIG.guiStrings.playerUsedACard;
+                flavourText = pseudoPythonInterpolate(
+                    HANABI_CONFIG.guiStrings.successDescription, flavourArgs
+                )
             }
         } else {
             title = HANABI_CONFIG.guiStrings.cardDiscarded;
@@ -353,13 +375,12 @@ export const hanabiController = function () {
         setSidePanelCard(
             title, cardAction.colour, cardAction.numValue
         );
-        $('#player-action-message').html(
-            pseudoPythonInterpolate(
-                actionSummaryFmt, {
-                    player: gameState.playerName(gameState.activePlayerId)
-                }
-            )
+        let actionSummary = pseudoPythonInterpolate(
+            actionSummaryFmt, {
+                player: gameState.playerName(gameState.activePlayerId)
+            }
         );
+        $('#player-action-message').html(`${actionSummary}<br/>${flavourText}`);
     }
 
     /** @param {HintAction} hint */
@@ -367,15 +388,35 @@ export const hanabiController = function () {
         $('#side-panel p.subtitle').text(
             HANABI_CONFIG.guiStrings.sidePanelHint
         ).css('visibility', 'visible');
-        $('#player-action-message').html(
-            pseudoPythonInterpolate(
-                HANABI_CONFIG.guiStrings.playerGaveAHint,
-                {
-                    playerFrom: gameState.playerName(gameState.activePlayerId),
-                    playerTo: gameState.playerName(hint.targetPlayer)
-                }
-            )
+        const genericMessage = pseudoPythonInterpolate(
+            HANABI_CONFIG.guiStrings.playerGaveAHint,
+            {
+                playerFrom: gameState.playerName(gameState.activePlayerId),
+                playerTo: gameState.playerName(hint.targetPlayer)
+            }
         );
+        let message;
+        if(hint.targetPlayer === playerContext().playerId) {
+            let hintDescription;
+            if(hint.isColourHint) {
+                hintDescription = pseudoPythonInterpolate(
+                    HANABI_CONFIG.guiStrings.markedCardsOfColour,
+                    {
+                        colourName: HANABI_CONFIG.guiStrings.colourNames[hint.hintValue],
+                        colourHex: colourValues[hint.hintValue]
+                    }
+                );
+            } else {
+                hintDescription = pseudoPythonInterpolate(
+                    HANABI_CONFIG.guiStrings.markedCardsOfValue,
+                    { numValue: hint.hintValue }
+                )
+            }
+            message = `${genericMessage}<br/>${hintDescription}`;
+        } else {
+            message = genericMessage;
+        }
+        $('#player-action-message').html(message);
         $('#side-panel-card').html(formatHintCard(hint));
     }
 
@@ -416,8 +457,8 @@ export const hanabiController = function () {
     }
 
     function updateCounters() {
-        $('#errors-left').text(gameState.errorsRemaining);
-        $('#tokens-left').text(gameState.tokensRemaining);
+        $('.errors-left').text(gameState.errorsRemaining);
+        $('.tokens-left').text(gameState.tokensRemaining);
         if(gameState.tokensRemaining === 0) {
             $('#discard-button').prop('disabled', true);
         }
