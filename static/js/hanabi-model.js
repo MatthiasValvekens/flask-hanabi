@@ -137,7 +137,7 @@ function parseAction(serverPlayerAction) {
         return null;
     }
 
-    const {action_type: actionType, player_id: actingPlayer} = serverPlayerAction;
+    const {type: actionType, player_id: actingPlayer} = serverPlayerAction;
 
     /**
      * @param {string} key
@@ -202,6 +202,7 @@ function parseAction(serverPlayerAction) {
                 numValue: serverPlayerAction.num_value,
                 position: serverPlayerAction.hand_pos
             };
+            break;
         default:
             throw `Invalid action type ${actionType}`
     }
@@ -242,6 +243,7 @@ function parseAction(serverPlayerAction) {
  * @typedef {Object} GameStateUpdate
  * @property {boolean} gameStateAdvanced
  * @property {Player[]} playersJoining
+ * @property {boolean} activePlayerChanged
  */
 export class GameState {
     /**
@@ -310,6 +312,7 @@ export class GameState {
         this._playerList = newPlayerList;
 
         let gameStateAdvanced = this._status !== status;
+        let activePlayerChanged = false;
         switch(status) {
             case GameStatus.INITIAL:
                 break;
@@ -319,14 +322,20 @@ export class GameState {
             case GameStatus.PLAYER_THINKING:
                 this._currentFireworks = serverUpdate.current_fireworks;
                 this._slotsInUse = serverUpdate.used_hand_slots;
-                this._activePlayerId = serverUpdate.active_player;
+                if(this._activePlayerId !== serverUpdate.active_player) {
+                    activePlayerChanged = true;
+                    this._activePlayerId = serverUpdate.active_player;
+                }
                 this._errorsRemaining = serverUpdate.errors_remaining;
                 this._tokensRemaining = serverUpdate.tokens_remaining;
                 this._cardsInHand = serverUpdate.cards_in_hand;
 
         }
         this._status = status;
-        return {gameStateAdvanced: gameStateAdvanced, playersJoining: joining};
+        return {
+            gameStateAdvanced: gameStateAdvanced, playersJoining: joining,
+            activePlayerChanged: activePlayerChanged
+        };
     }
 
     /**

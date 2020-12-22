@@ -246,6 +246,11 @@ export const hanabiController = function () {
             if(status !== GameStatus.INITIAL) {
                 updateFireworks();
                 updatePlayerHands();
+            }
+            // FIXME there are still bugs here
+            if(gameStateUpdate.activePlayerChanged) {
+                $('#side-panel').html('');
+                $('.hanabi-player-box.active-player').removeClass('active-player');
                 if(gameState.activePlayerId !== playerContext().playerId) {
                     let filter = `[data-player-id="${gameState.activePlayerId}"]`;
                     $(`#hanabi-other-players .hanabi-player-box${filter}`).addClass("active-player");
@@ -333,11 +338,11 @@ export const hanabiController = function () {
 
 
     function updateFireworks() {
-        $('#current-fireworks').each(function (i) {
+        $('#current-fireworks .hanabi-card').each(function (i) {
             let thisFireworkValue = gameState.currentFireworks[i];
             if(thisFireworkValue) {
                 $(this).removeClass("hanabi-empty-slot");
-                $(this).prop("data-hanabi-num-value", thisFireworkValue);
+                $(this).attr("data-hanabi-num-value", thisFireworkValue);
                 $(this).html(`<span>${thisFireworkValue}</span>`);
             } else {
                 $(this).addClass("hanabi-empty-slot");
@@ -370,7 +375,25 @@ export const hanabiController = function () {
             }
         ).join('');
     }
+
     function updatePlayerHands() {
+        let playerHandFmt = gameState.slotsInUse.map(
+            function(inUse, index) {
+                if(!inUse) {
+                    return emptySlot;
+                }
+                let act = gameState.currentAction;
+                let highlight = act && act.actionType === ActionType.HINT
+                                && act.action.targetPlayer === playerContext().playerId
+                                && act.action.positions.includes(index);
+
+                let hlCls = highlight ? " hanabi-card-highlighted" : "";
+                return `<div class="hanabi-card hanabi-state${hlCls}">
+                    <span>?</span>
+                </div>`
+            }
+        );
+        $('#player-hand').html(playerHandFmt);
         $('#hanabi-other-players .hanabi-player-box').each(
             function() {
                 let theId = parseInt($(this).attr('data-player-id'));
@@ -381,17 +404,43 @@ export const hanabiController = function () {
     }
 
     function handleHintModal() {
-        if(gameState.isCurrentlyActive) {
+        if(gameState.isCurrentlyActive && gameState.status === GameStatus.PLAYER_THINKING) {
             const hintModal = $('#give-hint-modal');
-            let theId = $(this).attr('data-player-id');
+            const theId = $(this).attr('data-player-id');
             hintModal.find('.hanabi-card-list').html(renderHandOfPlayer(theId, false));
             hintModal.addClass('is-active');
         }
     }
 
+    function handleCardPlay() {
+        if(gameState.isCurrentlyActive && gameState.status === GameStatus.PLAYER_THINKING) {
+            const cardPosition = $(this).index();
+            const playCardModal = $('#play-card-modal');
+            playCardModal.attr('data-card-position', cardPosition);
+            playCardModal.addClass('is-active');
+        }
+    }
+
+    /**
+     * @param {boolean} discard
+     */
+    function executeCardAction(discard) {
+        const playCardModal = $('#play-card-modal');
+        const position = playCardModal.attr('data-card-position');
+        playCardModal.removeClass('is-active');
+        callHanabiApi(
+            'post', playerContext().playEndpoint, {
+                type: discard ? ActionType.DISCARD : ActionType.PLAY,
+                position: position
+            }, forceRefresh
+        );
+    }
+
     return {
         joinExistingSession: joinExistingSession,
         triggerSessionSpawn: triggerSessionSpawn, startGame: startGame,
-        handleHintModal: handleHintModal
+        handleHintModal: handleHintModal, handleCardPlay: handleCardPlay,
+        executePlayAction: (() => executeCardAction(false)),
+        executeDiscardAction: (() => executeCardAction(true)),
     }
 }();

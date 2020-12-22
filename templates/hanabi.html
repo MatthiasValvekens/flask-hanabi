@@ -174,6 +174,8 @@
                 $('#spawn-session').click(controller.triggerSessionSpawn);
                 $('#join-session').click(controller.joinExistingSession);
                 $('#manager-start-game').click(controller.startGame);
+                $('#discard-button').click(controller.executeDiscardAction);
+                $('#play-card-button').click(controller.executePlayAction);
                 $('#inv-token-display-copy').click(function () {
                         const invTokenField = document.getElementById("inv-token-display");
                         invTokenField.select();
@@ -187,17 +189,21 @@
                     }
                 );
 
-                function closeHintModal() {
-                    $('#give-hint-modal').removeClass('is-active');
+                $('#player-hand').on(
+                    'click', '.hanabi-card', controller.handleCardPlay
+                );
+
+                function closeModals() {
+                    $('.modal').removeClass('is-active');
                 }
                 $('#hanabi-other-players').on(
-                    'click', '.hanabi-player-box',controller.handleHintModal
+                    'click', '.hanabi-player-box', controller.handleHintModal
                 );
-                $('#give-hint-modal button.delete').click(closeHintModal);
-                $('#give-hint-modal .modal-background').click(closeHintModal);
+                $('.modal button.delete').click(closeModals);
+                $('.modal-background').click(closeModals);
                 $(document).keyup(function(key) {
                     if(key.which === 27)
-                        closeHintModal();
+                        closeModals();
                 });
             }
         );
@@ -205,16 +211,30 @@
 </head>
 <body>
 <div id="loading-icon" style="display: none;"><span class="fas fa-pulse fa-spinner"></span></div>
+<div class="modal" id="play-card-modal" data-card-position="">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">{% trans %}Play or discard this card?{% endtrans %}</p>
+            <button class="delete" aria-label="{% trans %}close{% endtrans %}"></button>
+        </header>
+        <section class="modal-card-body has-text-centered">
+            <button class="button is-primary" id="play-card-button">{% trans %}Play card{% endtrans %}</button>
+            <button class="button is-danger" id="discard-button">{% trans %}Discard{% endtrans %}</button>
+        </section>
+    </div>
+</div>
 <div class="modal" id="give-hint-modal">
     <div class="modal-background"></div>
     <div class="modal-card">
         <header class="modal-card-head">
-            <p class="modal-card-title">{% trans %}Give a hint{% endtrans %}</p>
+            <p class="modal-card-title">{% trans %}Give a hint?{% endtrans %}</p>
             <button class="delete" aria-label="{% trans %}close{% endtrans %}"></button>
         </header>
         <section class="modal-card-body has-text-centered">
             <div class="hanabi-card-list"></div>
         </section>
+        {# TODO add widgets to select a hint #}
     </div>
 </div>
 <section class="section" id="start-section">
