@@ -495,7 +495,7 @@ export const hanabiController = function () {
     }
 
     /**
-     * @param {HeldCard[]} hand
+     * @param {(?HeldCard)[]} hand
      * @param {?int[]} highlights
      * @return {string}
      */
@@ -544,6 +544,7 @@ export const hanabiController = function () {
 
     function handleHintModal() {
         if(gameState.isCurrentlyActive && gameState.status === GameStatus.PLAYER_THINKING) {
+            $('#hint-selection .hanabi-card').removeClass('hanabi-card-highlighted');
             const hintModal = $('#give-hint-modal');
             const theId = parseInt($(this).attr('data-player-id'));
             $('#hint-submit').attr('data-target-id', theId);

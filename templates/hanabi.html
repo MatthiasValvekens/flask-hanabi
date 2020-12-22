@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Hanabi</title>
     <link rel="stylesheet" href="/static/css/bulma.min.css">
+    <link rel="stylesheet" href="/static/css/bulmaswatch-cyborg.min.css">
     <link rel="stylesheet" href="/static/css/fontawesome-all.min.css">
     <style>
         #player-list {
@@ -71,8 +72,8 @@
         .hanabi-card {
             display: inline-block;
             border-style: solid;
-            background-color: #f0f0f0;
-            color: black;
+            background-color: #333;
+            color: #aaa;
             border-radius: 0.7em;
             border-width: 0.3em;
             height: 5.3em;
@@ -96,7 +97,6 @@
         }
 
         .hanabi-card.hanabi-card-highlighted {
-            background-color: #f0f0f0;
             box-shadow: 0.3em 0.3em 1px #888888;
         }
 
@@ -180,6 +180,7 @@
                 }
             },
             cardPlayed: "{% trans %}Card played{% endtrans %}",
+            sidePanelHint: "{% trans %}Hint given{% endtrans %}",
             cardDiscarded: "{% trans %}Card discarded{% endtrans %}",
             itsYourTurn: "{% trans %}It's your turn!{% endtrans %}",
             playerUsedACard: "{% trans %}<b>%(player)s</b> successfully played a card.{% endtrans %}",
@@ -194,6 +195,7 @@
         };
         $(document).ready(
             function() {
+                $('#status-box').text(hanabi.HANABI_CONFIG.guiStrings.statusString(hanabi.GameStatus.INITIAL));
                 $('#spawn-session').click(controller.triggerSessionSpawn);
                 $('#join-session').click(controller.joinExistingSession);
                 $('#manager-start-game').click(controller.startGame);
