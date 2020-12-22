@@ -171,7 +171,7 @@
             statusString: function(status) {
                 switch(status) {
                     case hanabi.GameStatus.INITIAL:
-                        return "{% trans %}Waiting for game to start...{% endtrans %}";
+                        return "{% trans %}Waiting for players to join...{% endtrans %}";
                     case hanabi.GameStatus.PLAYER_THINKING:
                         return "{% trans %}Waiting for player to act...{% endtrans %}";
                     case hanabi.GameStatus.TURN_END:
@@ -262,11 +262,11 @@
             <table class="table is-centered">
                 <tr>
                     <td>{% trans %}Penalties left{% endtrans %}</td>
-                    <td class="errors-left">0</td>
+                    <td><span class="errors-left">0</span>&ensp;<span class="fas fa-bolt"></span></td>
                 </tr>
                 <tr>
                     <td>{% trans %}Tokens left{% endtrans %}</td>
-                    <td class="tokens-left">0</td>
+                    <td><span class="tokens-left">0</span>&ensp;<span class="fas fa-coins"></span></td>
                 </tr>
             </table>
             <button class="button is-primary" id="play-card-button">{% trans %}Play card{% endtrans %}</button>
@@ -451,7 +451,7 @@
                     <div id="side-panel-card">
                         <div class="hanabi-card hanabi-state hanabi-empty-slot"></div>
                     </div>
-                    <button id="end-turn-button" class="button is-primary" style="visibility: hidden">
+                    <button id="end-turn-button" class="button is-primary" style="visibility: hidden; margin-bottom: 2em;">
                         <span>{% trans %}End turn{% endtrans %}</span>
                         <span class="icon is-small">
                             <span class="fas fa-fast-forward is-right"></span>
@@ -459,12 +459,12 @@
                     </button>
                     <table class="table is-centered">
                         <tr>
-                            <td>{% trans %}Mistakes left{% endtrans %}</td>
-                            <td class="errors-left">0</td>
+                            <td>{% trans %}Penalties left{% endtrans %}</td>
+                            <td><span class="errors-left">0</span>&ensp;<span class="fas fa-bolt"></span></td>
                         </tr>
                         <tr>
                             <td>{% trans %}Tokens left{% endtrans %}</td>
-                            <td class="tokens-left">0</td>
+                            <td><span class="tokens-left">0</span>&ensp;<span class="fas fa-coins"></span></td>
                         </tr>
                     </table>
                 </div>
@@ -484,7 +484,7 @@
     <div class="container">
         <h5 class="title is-5 has-text-centered">{% trans %}Management console{% endtrans %}</h5>
         <div class="box">
-            <div class="columns is-centered">
+            <div class="columns is-centered has-text-centered">
                 <div class="column is-half-desktop is-three-quarters-tablet is-full-mobile is-one-third-fullhd">
                     <div class="field has-addons">
                         <div class="control is-expanded has-icons-left">
