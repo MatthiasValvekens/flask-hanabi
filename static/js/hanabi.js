@@ -11,6 +11,8 @@ export {GameStatus} from './hanabi-model.js';
  * @property {string} playerUsedACard
  * @property {string} playerDiscardedACard
  * @property {string} playerMadeAMistake
+ * @property {string} sidePanelHint
+ * @property {string} playerGaveAHint
  */
 
 /**
@@ -172,7 +174,7 @@ export const hanabiController = function () {
         _sessionContext = new hanabiModel.SessionContext(parseInt(match[1]), match[2], match[3])
         $('#join-session').addClass("is-loading").prop("disabled", true);
 
-        requestJoin(name).fail(function() {
+        requestJoin(/** @type {!string} */ name).fail(function() {
             invToken.addClass("is-danger");
             $('#inv-token-error').show();
             _sessionContext = null;
@@ -276,38 +278,15 @@ export const hanabiController = function () {
                         .prop('disabled', true);
                 }
                 let action = gameState.currentAction;
-                if(action !== null && action.actionType !== ActionType.HINT) {
-                    let cardAction = action.action;
-                    let title, actionSummaryFmt;
-                    if(cardAction.wasPlay) {
-                        title = HANABI_CONFIG.guiStrings.cardPlayed;
-                        if(cardAction.wasError) {
-                            actionSummaryFmt = HANABI_CONFIG.guiStrings.playerMadeAMistake;
-                        } else {
-                            actionSummaryFmt = HANABI_CONFIG.guiStrings.playerUsedACard;
-                        }
-                    } else {
-                        title = HANABI_CONFIG.guiStrings.cardDiscarded;
-                        actionSummaryFmt = HANABI_CONFIG.guiStrings.playerDiscardedACard;
-                    }
-                    setSidePanelCard(
-                        title, action.action.colour, action.action.numValue
-                    );
-                    $('#player-action-message').html(
-                        pseudoPythonInterpolate(
-                            actionSummaryFmt, {
-                                player: gameState.playerName(gameState.activePlayerId)
-                            }
-                        )
-                    );
-                } else {
-                    // TODO render hint
-                    // card highlighting is taken care of by updatePlayerHands()
-
-                    // These are all your <span class="hanabi-state" data-hanabi-col="0">green</span> cards.
+                if(action === null) {
                     clearSidePanelCard();
                     $('#player-action-message').text('');
+                } else if(action.actionType !== ActionType.HINT) {
+                    processCardAction(/** @type{CardAction} */ action.action);
+                } else {
+                    processHint(/** @type {HintAction} */ action.action);
                 }
+
             }
 
             if(gameState.playerList.length >= 2 && status === GameStatus.INITIAL) {
@@ -331,11 +310,10 @@ export const hanabiController = function () {
     }
 
     function triggerSessionSpawn() {
-        /** @type {string} */
         const name = retrievePlayerName();
         if(name === null)
             return;
-        spawnSession(name);
+        spawnSession(/** @type {!string} */name);
     }
 
     function startGame() {
@@ -353,6 +331,69 @@ export const hanabiController = function () {
     function setSidePanelCard(title, colour, value) {
         $('#side-panel p.subtitle').text(title).css('visibility', 'visible');
         $('#side-panel-card').html(formatCard(colour, value, true));
+    }
+
+    /**
+     * @param {CardAction} cardAction
+     */
+    function processCardAction(cardAction) {
+        let title, actionSummaryFmt;
+        if(cardAction.wasPlay) {
+            title = HANABI_CONFIG.guiStrings.cardPlayed;
+            if(cardAction.wasError) {
+                actionSummaryFmt = HANABI_CONFIG.guiStrings.playerMadeAMistake;
+            } else {
+                actionSummaryFmt = HANABI_CONFIG.guiStrings.playerUsedACard;
+            }
+        } else {
+            title = HANABI_CONFIG.guiStrings.cardDiscarded;
+            actionSummaryFmt = HANABI_CONFIG.guiStrings.playerDiscardedACard;
+        }
+        setSidePanelCard(
+            title, cardAction.colour, cardAction.numValue
+        );
+        $('#player-action-message').html(
+            pseudoPythonInterpolate(
+                actionSummaryFmt, {
+                    player: gameState.playerName(gameState.activePlayerId)
+                }
+            )
+        );
+    }
+
+    /** @param {HintAction} hint */
+    function processHint(hint) {
+        $('#side-panel p.subtitle').text(
+            HANABI_CONFIG.guiStrings.sidePanelHint
+        ).css('visibility', 'visible');
+        $('#player-action-message').html(
+            pseudoPythonInterpolate(
+                HANABI_CONFIG.guiStrings.playerGaveAHint,
+                {
+                    playerFrom: gameState.playerName(gameState.activePlayerId),
+                    playerTo: gameState.playerName(hint.targetPlayer)
+                }
+            )
+        );
+        $('#side-panel-card').html(formatHintCard(hint));
+    }
+
+    /**
+     * @param {HintAction} hint
+     * @return {string}
+     */
+    function formatHintCard(hint) {
+        let tagRmdr = "";
+        let inner;
+        if(hint.isColourHint) {
+            tagRmdr = `data-hanabi-col=${hint.hintValue}`;
+            inner = "?";
+        } else {
+            inner = hint.hintValue;
+        }
+        return `<div class="hanabi-card hanabi-state hanabi-card-highlighted" ${tagRmdr}>
+                <span>${inner}</span>
+        </div>`;
     }
 
     function clearSidePanelCard() {
@@ -430,11 +471,13 @@ export const hanabiController = function () {
                 let highlight = act && act.actionType === ActionType.HINT
                                 && act.action.targetPlayer === playerContext().playerId
                                 && act.action.positions.includes(index);
-
-                let hlCls = highlight ? " hanabi-card-highlighted" : "";
-                return `<div class="hanabi-card hanabi-state${hlCls}">
-                    <span>?</span>
-                </div>`
+                if(highlight) {
+                    return formatHintCard(/** @type {HintAction} */ act.action);
+                } else {
+                    return `<div class="hanabi-card hanabi-state">
+                        <span>?</span>
+                    </div>`
+                }
             }
         );
         $('#player-hand').html(playerHandFmt);
