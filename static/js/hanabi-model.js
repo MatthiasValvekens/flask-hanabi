@@ -228,9 +228,11 @@ function parseAction(serverPlayerAction) {
  * @property {ServerPlayer[]} players - List of players
  * @property {int} active_player - Currently active player
  * @property {int} status - State of the session
+ * @property {int} turn - Current turn
  * @property {int} cards_in_hand - No. of cards that players are allowed to hold
  * @property {int} errors_remaining - Errors remaining
  * @property {int} tokens_remaining - Tokens remaining
+ * @property {int} cards_remaining - Cards left in the deck
  * @property {int[]} current_fireworks - Current state of the fireworks
  * @property {boolean[]} used_hand_slots - Used slots in player's hand
  * @property {?ServerPlayerAction} last_action - Action taken by current player
@@ -277,6 +279,11 @@ export class GameState {
         this._errorsRemaining = 0;
         /** @type {int} */
         this._tokensRemaining = 0;
+        /** @type {int} */
+        this._cardsRemaining = 0;
+
+        /** @type {int} */
+        this._turn = 0;
 
         /** @type {?int} */
         this._score = null;
@@ -288,7 +295,7 @@ export class GameState {
      * @return {GameStateUpdate}
      */
     updateState(serverUpdate) {
-        let { status } = serverUpdate;
+        let { status, turn } = serverUpdate;
         let handsByPlayerId = this._handsByPlayerId;
         let playerNamesById = this._playerNamesById;
         const newPlayerList = serverUpdate.players.map(
@@ -317,7 +324,7 @@ export class GameState {
         const joining = newPlayerList.filter(({playerId}) => !oldIdSet.has(playerId));
         this._playerList = newPlayerList;
 
-        let gameStateAdvanced = this._status !== status;
+        let gameStateAdvanced = this._status !== status || this._turn !== turn;
         let activePlayerChanged = false;
         if(status !== GameStatus.INITIAL) {
             this._slotsInUse = serverUpdate.used_hand_slots;
@@ -327,6 +334,7 @@ export class GameState {
             }
             this._errorsRemaining = serverUpdate.errors_remaining;
             this._tokensRemaining = serverUpdate.tokens_remaining;
+            this._cardsRemaining = serverUpdate.cards_remaining;
             this._currentFireworks = serverUpdate.current_fireworks;
         }
         if(status === GameStatus.TURN_END) {
@@ -335,6 +343,7 @@ export class GameState {
             this._currentAction = null;
         }
         this._status = status;
+        this._turn = turn;
         if(status === GameStatus.GAME_OVER
             && serverUpdate.hasOwnProperty('score')
             && serverUpdate.score !== null) {
@@ -386,6 +395,13 @@ export class GameState {
      */
     get errorsRemaining() {
         return this._errorsRemaining;
+    }
+
+    /**
+     * @return {int}
+     */
+    get cardsRemaining() {
+        return this._cardsRemaining;
     }
 
     /**

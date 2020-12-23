@@ -150,6 +150,12 @@ class HanabiSession(db.Model):
     def game_running(self) -> bool:
         return self.active_player_id is not None
 
+    @property
+    def cards_left(self) -> int:
+        return db.session.query(
+            func.coalesce(func.sum(DeckReserve.cards_left), 0)
+        ).filter(DeckReserve.session_id == self.id).scalar()
+
     def current_seed(self, pepper):
         if app.config.get('TESTING', False):
             seed_suffix = app.config['TESTING_SEED']
@@ -430,7 +436,8 @@ def session_state(session_id: int, calling_player: int = None):
     response = {
         'created': sess.created,
         'players': list(player_json_objects.values()),
-        'colour_count': sess.colour_count
+        'colour_count': sess.colour_count,
+        'turn': sess.turn
     }
     score = sess.final_score
     if not sess.game_running:
@@ -449,6 +456,7 @@ def session_state(session_id: int, calling_player: int = None):
     response['current_fireworks'] = query_fireworks_status(sess)
     response['errors_remaining'] = sess.errors_remaining
     response['tokens_remaining'] = sess.tokens_remaining
+    response['cards_remaining'] = sess.cards_left
     response['cards_in_hand'] = sess.cards_in_hand
 
     # tweak player json objects to include their hands,

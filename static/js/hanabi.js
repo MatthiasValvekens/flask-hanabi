@@ -469,6 +469,7 @@ export const hanabiController = function () {
     function updateCounters() {
         $('.errors-left').text(gameState.errorsRemaining);
         $('.tokens-left').text(gameState.tokensRemaining);
+        $('.cards-left').text(gameState.cardsRemaining);
         if(gameState.tokensRemaining === 0) {
             $('#discard-button').prop('disabled', true);
         }

@@ -275,6 +275,7 @@ def test_discard_one_card(client):
     assert rdata['current_fireworks'] == [0, 0, 0, 0, 0]
     assert rdata['errors_remaining'] == 3
     assert rdata['active_player'] == gc1.player_id
+    assert rdata['cards_remaining'] == 42
     action = rdata['last_action']
     assert action['type'] == 'DISCARD'
     assert action['colour'] == P1_INITIAL_HAND[1]['colour']
@@ -286,6 +287,7 @@ def test_discard_one_card(client):
     client.post(gc1.play_url + '/advance')
     response = client.get(gc2.play_url)
     rdata = response.get_json()
+    assert rdata['cards_remaining'] == 41
     assert rdata['players'][0]['hand'][1] is not None
     assert rdata['active_player'] == gc2.player_id
 
@@ -359,6 +361,7 @@ def test_give_colour_hint(client):
     rdata = response.get_json()
     assert rdata['active_player'] == gc2.player_id
 
+
 def test_no_self_hints(client):
     sess, gc1, gc2 = two_players(client)
     response = request_json(
@@ -398,6 +401,7 @@ def test_give_null_hint(client):
     assert None not in rdata['players'][0]['hand'][1]
     assert rdata['current_fireworks'] == [0, 0, 0, 0, 0]
     assert rdata['errors_remaining'] == 3
+    assert rdata['cards_remaining'] == 42
     assert rdata['active_player'] == gc1.player_id
     action = rdata['last_action']
     assert action['type'] == 'HINT'
