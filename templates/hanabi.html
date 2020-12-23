@@ -133,7 +133,7 @@
             background: #830303;
             border-radius:2px 2px 0 0;
             color: #fff;
-            content: "playing";
+            content: "{% trans %}playing{% endtrans %}";
             display:inline-block;
             font-size: 90%;
             font-weight:700;
@@ -434,7 +434,7 @@
                     </div>
                 </div>
                 <div class="column is-4">
-                    <h6 class="has-text-weight-bold has-text-centered">Players</h6>
+                    <h6 class="has-text-weight-bold has-text-centered">{% trans %}Players{% endtrans %}</h6>
                     <div id="player-list">
                         <ul>
                         </ul>
@@ -498,9 +498,7 @@
         </div>
 
         <p class="only-when-active has-text-centered has-text-weight-bold" style="visibility: hidden">
-            {% trans %}
-                Click on a player's hand to give them a hint.
-            {% endtrans %}
+            {% trans %}Click a player's hand to give them a hint.{% endtrans %}
         </p>
         <div class="tile is-ancestor" id="hanabi-other-players">
         </div>
