@@ -50,6 +50,7 @@ def init_db():
         HanabiSession, Player, HeldCard, Fireworks, DeckReserve, ActionLog
     )
     for Model in models:
+        # noinspection PyUnresolvedReferences
         Model.__table__.create(bind, checkfirst=True)
 
     with db.engine.connect() as con:
@@ -643,7 +644,8 @@ def query_deck_status(session: HanabiSession, for_update=False) -> Deck:
     )
 
 
-def _draw_cards(positions, deck: Deck, rng: random.Random, session_id, player_id):
+def _draw_cards(positions, deck: Deck, rng: random.Random,
+                session_id, player_id):
     if deck.total_left < len(positions):
         raise ActionNotValid("Not enough cards left to draw")
 
@@ -659,7 +661,9 @@ def _draw_cards(positions, deck: Deck, rng: random.Random, session_id, player_id
 def draw_card(session: HanabiSession, player_id, pepper):
     deck = query_deck_status(session, for_update=True)
 
-    cur_hand = query_hand_for_current_player(session, player_id, for_update=True)
+    cur_hand = query_hand_for_current_player(
+        session, player_id, for_update=True
+    )
 
     for pos, card in enumerate(cur_hand):
         if card is None:
@@ -708,7 +712,6 @@ def end_turn(session: HanabiSession, pepper):
     # check if the score is maxed out or if the last round is over
     if score == session.colour_count * MAX_NUM_VALUE or \
             session.active_player_id == session.stop_game_after:
-        # insta-win
         stop_game(session, score=score)
         return
 
@@ -997,7 +1000,8 @@ def manage_session(session_id, pepper, mgmt_token):
 
         if sess.players_present < 2:
             return abort(
-                409, description="Cannot start game without at least two players"
+                409,
+                description="Cannot start game without at least two players"
             )
 
         # initialise the session

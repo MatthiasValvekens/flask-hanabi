@@ -567,6 +567,9 @@ export const hanabiController = function () {
     function handleCardPlay() {
         if(gameState.isCurrentlyActive && gameState.status === GameStatus.PLAYER_THINKING) {
             const cardPosition = $(this).index();
+            if(gameState.cardsHeldBy(gameState.activePlayerId)[cardPosition] === null) {
+                return;
+            }
             const playCardModal = $('#play-card-modal');
             playCardModal.attr('data-card-position', cardPosition);
             playCardModal.addClass('is-active');
@@ -612,6 +615,9 @@ export const hanabiController = function () {
         const recipientCards = $('#hint-recipient-cards').children();
         recipientCards.removeClass('hanabi-card-highlighted');
         hand.forEach(function(card, ix) {
+            if(card === null) {
+                return;
+            }
             let matches = (hintType === "colour" && card.colour === hintValue)
                           || (hintType === "num_value" && card.numValue === hintValue);
             if(matches) {
