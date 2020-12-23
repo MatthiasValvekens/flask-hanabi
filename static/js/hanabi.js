@@ -19,6 +19,8 @@ export {GameStatus} from './hanabi-model.js';
  * @property {string} playerStandby
  * @property {string} markedCardsOfColour
  * @property {string} markedCardsOfValue
+ * @property {string} noCardsOfColour
+ * @property {string} noCardsOfValue
  * @property {string} mistakeDescription
  * @property {string} successDescription
  */
@@ -26,15 +28,19 @@ export {GameStatus} from './hanabi-model.js';
 /**
  * Hanabi configuration parameters.
  *
- * @type {Object}
+ * @typedef HanabiConfig
  * @property {string} apiBaseURL - Base URL for the Hanabi API
  * @property {int} heartbeatTimeout - Timeout in milliseconds between state polls.
  * @property {GUIStrings} guiStrings - GUI string functions
  */
+
+/**
+ * @type {HanabiConfig}
+ */
 export const HANABI_CONFIG = {
     apiBaseURL: "",
     heartbeatTimeout: 3000,
-    guiStrings: null
+    guiStrings: /** @type {GUIStrings} */ null
 };
 
 export function pseudoPythonInterpolate(fmt, obj) {
@@ -410,12 +416,11 @@ export const hanabiController = function () {
 
     /** @param {HintAction} hint */
     function processHint(hint) {
-        $('#side-panel p.subtitle').text(
-            HANABI_CONFIG.guiStrings.sidePanelHint
-        ).css('visibility', 'visible');
+        const strings = HANABI_CONFIG.guiStrings;
+        $('#side-panel p.subtitle').text(strings.sidePanelHint)
+            .css('visibility', 'visible');
         const genericMessage = pseudoPythonInterpolate(
-            HANABI_CONFIG.guiStrings.playerGaveAHint,
-            {
+            strings.playerGaveAHint, {
                 playerFrom: gameState.playerName(gameState.activePlayerId),
                 playerTo: gameState.playerName(hint.targetPlayer)
             }
@@ -425,15 +430,15 @@ export const hanabiController = function () {
             let hintDescription;
             if(hint.isColourHint) {
                 hintDescription = pseudoPythonInterpolate(
-                    HANABI_CONFIG.guiStrings.markedCardsOfColour,
+                    hint.positions.length ? strings.markedCardsOfColour : strings.noCardsOfColour,
                     {
-                        colourName: HANABI_CONFIG.guiStrings.colourNames[hint.hintValue],
+                        colourName: strings.colourNames[hint.hintValue],
                         colourHex: colourValues[hint.hintValue]
                     }
                 );
             } else {
                 hintDescription = pseudoPythonInterpolate(
-                    HANABI_CONFIG.guiStrings.markedCardsOfValue,
+                    hint.positions.length ? strings.markedCardsOfValue : strings.noCardsOfValue,
                     { numValue: hint.hintValue }
                 )
             }
