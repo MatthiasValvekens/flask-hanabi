@@ -23,6 +23,7 @@ export {GameStatus} from './hanabi-model.js';
  * @property {string} noCardsOfValue
  * @property {string} mistakeDescription
  * @property {string} successDescription
+ * @property {string} endOfTurnWait
  */
 
 /**
@@ -296,7 +297,8 @@ export const hanabiController = function () {
                     updateCounters();
                 }
                 if(status === GameStatus.TURN_END && gameState.isCurrentlyActive) {
-                    $('#end-turn-button').css('visibility', 'visible')
+                    $('#end-turn-button').removeClass('is-loading')
+                        .css('visibility', 'visible')
                         .prop('disabled', false);
                 } else {
                     $('#end-turn-button').css('visibility', 'hidden')
@@ -676,9 +678,18 @@ export const hanabiController = function () {
     }
 
     function endTurn() {
+        $('#end-turn-button').addClass("is-loading").prop(
+            "disabled", true
+        );
         callHanabiApi(
             'post', playerContext().playEndpoint + '/advance', {},
-            forceRefresh
+            forceRefresh, function(xhr, textStatus) {
+                if(xhr.status === 425) {
+                    $('#status-box').text(HANABI_CONFIG.guiStrings.endOfTurnWait);
+                } else {
+                    console.log(`Advance turn request failed: ${textStatus}`);
+                }
+            }
         );
     }
 

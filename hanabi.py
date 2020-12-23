@@ -101,6 +101,10 @@ class HanabiSession(db.Model):
         db.Integer, nullable=False,
         default=app.config['POST_ACTION_TIME_LIMIT_SECONDS']
     )
+    post_action_min_time = db.Column(
+        db.Integer, nullable=False,
+        default=app.config['POST_ACTION_MINIMAL_TIME_SECONDS']
+    )
     max_tokens = db.Column(
         db.Integer, nullable=False, default=app.config['TOKEN_COUNT']
     )
@@ -1129,8 +1133,33 @@ def advance(session_id, pepper, player_id, player_token):
     if sess.end_turn_at is None:
         return abort(409, description="Action required")
 
-    end_turn(sess, pepper)
-    return session_state(session_id, player_id)
+    # there are two things at play: end_turn_at is a "dead man's switch"
+    # that triggers the EOT logic automatically if the acting player forgets
+    # to perform an action.
+    # If the player clicks the "advance" button manually, they want to end their
+    # turn ASAP, but we should allow the other players to evaluate the last
+    # action. If the minimal post-action time hasn't passed by this point,
+    # we reschedule end_turn_at to the earliest possible point,
+    # otherwise we end the turn right there.
+
+    now = datetime.utcnow()
+    player_acted_at = sess.end_turn_at - timedelta(
+        seconds=sess.post_action_time_limit
+    )
+    earliest_possible_eot = player_acted_at + timedelta(
+        seconds=sess.post_action_min_time
+    )
+    if now >= earliest_possible_eot:
+        # minimal time has elapsed, end the turn.
+        end_turn(sess, pepper)
+        status = 200
+    else:
+        # reschedule EOT
+        sess.end_turn_at = earliest_possible_eot
+        status = 425  # 425 Too Early
+        db.session.commit()
+
+    return jsonify({}), status
 
 
 @app.route(play_url + '/discarded', methods=['GET'])
