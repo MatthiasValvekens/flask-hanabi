@@ -470,9 +470,7 @@ export const hanabiController = function () {
         $('.errors-left').text(gameState.errorsRemaining);
         $('.tokens-left').text(gameState.tokensRemaining);
         $('.cards-left').text(gameState.cardsRemaining);
-        if(gameState.tokensRemaining === 0) {
-            $('#discard-button').prop('disabled', true);
-        }
+        $('#discard-button').prop('disabled', gameState.tokensRemaining === 0);
     }
 
     function updateFireworks() {

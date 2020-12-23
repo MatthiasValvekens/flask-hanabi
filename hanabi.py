@@ -802,6 +802,11 @@ def play_card(session: HanabiSession, pos: int):
 
     if playable:
         fw.current_value = card_type.num_value
+
+        # give back a token as a reward for completing a series
+        if card_type.num_value == 5 \
+                and session.tokens_remaining < app.config['TOKEN_COUNT']:
+            session.tokens_remaining += 1
     else:
         session.errors_remaining -= 1
 
