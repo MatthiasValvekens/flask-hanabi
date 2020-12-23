@@ -6,6 +6,7 @@ export {GameStatus} from './hanabi-model.js';
 /**
  * @typedef GUIStrings
  * @property {function} statusString - Return status text for the given round state
+ * @property {function} scoreFlavourText
  * @property {string[]} colourNames
  * @property {string} cardPlayed
  * @property {string} cardDiscarded
@@ -249,15 +250,17 @@ export const hanabiController = function () {
             // update the player list
             let currentPlayer = playerContext().playerId;
             const playerListUl = $('#player-list ul');
-            let playerListFmtd = gameStateUpdate.playersJoining.map(
-                ({playerId, name}) =>
-                    `<li data-player-id="${playerId}" ${playerId === currentPlayer ? 'class="me"' : ''}>
+            if(gameStateUpdate.playersJoining) {
+                let playerListFmtd = gameStateUpdate.playersJoining.map(
+                    ({playerId, name}) =>
+                        `<li data-player-id="${playerId}" ${playerId === currentPlayer ? 'class="me"' : ''}>
                     ${name}
                     </li>`
-            ).join('');
-            let playerCardViews = gameStateUpdate.playersJoining.map(formatOtherPlayerView).join('');
-            playerListUl.append(playerListFmtd);
-            $('#hanabi-other-players').append(playerCardViews);
+                ).join('');
+                let playerCardViews = gameStateUpdate.playersJoining.map(formatOtherPlayerView).join('');
+                playerListUl.append(playerListFmtd);
+                $('#hanabi-other-players').append(playerCardViews);
+            }
 
             // update status box
             let statusString = HANABI_CONFIG.guiStrings.statusString(status);
@@ -273,9 +276,9 @@ export const hanabiController = function () {
                     $('.only-when-active').css('visibility', 'hidden');
                 }
             }
-            if(gameStateUpdate.gameStateAdvanced) {
+            if(gameStateUpdate.gameStateAdvanced && !gameState.isGameOver) {
                 $('#status-box').text(statusString);
-                if(status !== GameStatus.INITIAL) {
+                if(gameState.isGameRunning) {
                     $('.standby-message').remove();
                     updateFireworks();
                     updatePlayerHands();
@@ -297,7 +300,12 @@ export const hanabiController = function () {
                 } else {
                     processHint(/** @type {HintAction} */ action.action);
                 }
-
+            } else if(gameState.isGameOver) {
+                let score = gameState.finalScore;
+                $('#total-score-box').text(score);
+                $('#score-flavour-text').text(HANABI_CONFIG.guiStrings.scoreFlavourText(score));
+                $('#game-section').hide();
+                $('#game-over').show();
             }
 
             if(gameState.playerList.length >= 2 && status === GameStatus.INITIAL) {
@@ -305,7 +313,9 @@ export const hanabiController = function () {
             }
         }).always(function() {
             // reschedule the timer, also on failures
-            heartbeatTimer = setTimeout(heartbeat, HANABI_CONFIG.heartbeatTimeout);
+            if(!gameState.isGameOver) {
+                heartbeatTimer = setTimeout(heartbeat, HANABI_CONFIG.heartbeatTimeout);
+            }
             toggleBusy(false);
         });
     }

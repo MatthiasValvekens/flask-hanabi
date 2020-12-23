@@ -150,6 +150,10 @@
             margin-left: auto;
             margin-right: auto;
         }
+
+        #total-score-box {
+            font-size: 300%;
+        }
     </style>
     <script type="text/javascript" src="/static/js/jquery.min.js"></script>
     <script type="module">
@@ -180,6 +184,21 @@
                         return "{% trans %}The results are in!{% endtrans %}";
                     default:
                         throw "No GUI string available";
+                }
+            },
+            scoreFlavourText: function(score) {
+                if(score <= 5) {
+                    return "{% trans %}The crowd wants their money back!{% endtrans %}";
+                } else if(score <= 10) {
+                    return "{% trans %}The crowd's reaction is tepid.{% endtrans %}";
+                } else if(score <= 15) {
+                    return "{% trans %}The crowd appears to be satisfied.{% endtrans %}";
+                } else if(score <= 20) {
+                    return "{% trans %}The crowd is pleased!{% endtrans %}";
+                } else if(score <= 24) {
+                    return "{% trans %}The crowd is enthousiastic!{% endtrans %}";
+                } else {
+                    return "{% trans %}Legendary!! The crowd goes absolutely bananas!{% endtrans %}";
                 }
             },
             cardPlayed: "{% trans %}Card played{% endtrans %}",
@@ -477,6 +496,18 @@
             {% endtrans %}
         </p>
         <div class="tile is-ancestor" id="hanabi-other-players">
+        </div>
+    </div>
+</section>
+<section class="section" id="game-over" style="display: none">
+    <div class="container has-text-centered">
+        <h2 class="title is-2">{% trans %}Game over{% endtrans %}</h2>
+        <div class="box">
+            <h5 class="title is-5">{% trans %}Total score{% endtrans %}</h5>
+            <div id="total-score-box" class="has-text-weight-bold">
+                14
+            </div>
+            <p class="subtitle" id="score-flavour-text"></p>
         </div>
     </div>
 </section>

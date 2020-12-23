@@ -234,6 +234,7 @@ function parseAction(serverPlayerAction) {
  * @property {int[]} current_fireworks - Current state of the fireworks
  * @property {boolean[]} used_hand_slots - Used slots in player's hand
  * @property {?ServerPlayerAction} last_action - Action taken by current player
+ * @property {?int} score - Final score
  */
 
 /**
@@ -277,8 +278,8 @@ export class GameState {
         /** @type {int} */
         this._tokensRemaining = 0;
 
-        /** @type {int} */
-        this._cardsInHand = 0;
+        /** @type {?int} */
+        this._score = null;
     }
 
     /**
@@ -298,6 +299,7 @@ export class GameState {
                 playerNamesById[player_id] = name;
                 if(serverPlayer.hand) {
                     handsByPlayerId[player_id] = serverPlayer.hand.map(
+                        /** @param {?ServerCard} theCard */
                         function(theCard) {
                             if(theCard === null) {
                                 return null;
@@ -325,7 +327,6 @@ export class GameState {
             }
             this._errorsRemaining = serverUpdate.errors_remaining;
             this._tokensRemaining = serverUpdate.tokens_remaining;
-            this._cardsInHand = serverUpdate.cards_in_hand;
             this._currentFireworks = serverUpdate.current_fireworks;
         }
         if(status === GameStatus.TURN_END) {
@@ -334,6 +335,11 @@ export class GameState {
             this._currentAction = null;
         }
         this._status = status;
+        if(status === GameStatus.GAME_OVER
+            && serverUpdate.hasOwnProperty('score')
+            && serverUpdate.score !== null) {
+            this._score = serverUpdate.score;
+        }
         return {
             gameStateAdvanced: gameStateAdvanced, playersJoining: joining,
             activePlayerChanged: activePlayerChanged
@@ -404,13 +410,6 @@ export class GameState {
     }
 
     /**
-     * @return {int}
-     */
-    get numCardsInHand() {
-        return this._cardsInHand;
-    }
-
-    /**
      * @param {int} playerId
      * @return {(?HeldCard)[]}
      */
@@ -428,5 +427,30 @@ export class GameState {
             return `Player #${playerId}`;
         }
         return this._playerNamesById[playerId];
+    }
+
+    /**
+     * @return {boolean}
+     */
+    get isGameOver() {
+        return this._status === GameStatus.GAME_OVER;
+    }
+
+    /**
+     * @return {boolean}
+     */
+    get isGameRunning() {
+        return this._status === GameStatus.PLAYER_THINKING || this._status === GameStatus.TURN_END;
+    }
+
+    /**
+     * @return {int}
+     */
+    get finalScore() {
+        if(this._status === GameStatus.GAME_OVER) {
+            return this._score;
+        } else {
+            throw "The game isn't over yet.";
+        }
     }
 }
