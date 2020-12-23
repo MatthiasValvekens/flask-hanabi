@@ -7,8 +7,9 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2020-12-23 16:10+0100\n"
-"PO-Revision-Date: 2020-12-23 16:26+0100\n"
+"POT-Creation-Date: 2020-12-23 16:27+0100\n"
+"PO-Revision-Date: 2020-12-23 16:27+0100\n"
+"Last-Translator: \n"
 "Language: nl\n"
 "Language-Team: nl <LL@li.org>\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
@@ -16,7 +17,6 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.9.0\n"
-"Last-Translator: \n"
 "X-Generator: Poedit 2.3\n"
 
 #: templates/hanabi.html:169
@@ -108,8 +108,8 @@ msgstr "<b>%(player)s</b> heeft een fout gemaakt."
 #: templates/hanabi.html:210
 #, python-format
 msgid ""
-"The <span style=\\\"color: %(colourHex)s\\\">%(colourName)s "
-"%(numValue)s</span> disturbs the flow of the firework show. Oh no!"
+"The <span style=\\\"color: %(colourHex)s\\\">%(colourName)s %(numValue)s</"
+"span> disturbs the flow of the firework show. Oh no!"
 msgstr ""
 "De <span style=\\\"color: %(colourHex)s\\\">%(colourName)s %(numValue)s</"
 "span> gaat in tegen de flow van de vuurwerkshow. Ai!"
@@ -117,8 +117,8 @@ msgstr ""
 #: templates/hanabi.html:211
 #, python-format
 msgid ""
-"The <span style=\\\"color: %(colourHex)s\\\">%(colourName)s "
-"%(numValue)s</span> lights up the night sky!"
+"The <span style=\\\"color: %(colourHex)s\\\">%(colourName)s %(numValue)s</"
+"span> lights up the night sky!"
 msgstr ""
 "De nachthemel licht op door de <span style=\\\"color: %(colourHex)s\\\">"
 "%(colourName)s %(numValue)s</span>!"
@@ -130,9 +130,9 @@ msgstr "<b>%(player)s</b> heeft een kaart weggegooid."
 
 #: templates/hanabi.html:213
 #, python-format
-msgid "<b>%(playerFrom)s</b> gave a hint to <b>%(playerTo)s</b>"
+msgid "<b>%(playerFrom)s</b> gave a hint to <b>%(playerTo)s</b>."
 msgstr ""
-"<b>%(playerFrom)s</b> heeft een hint gegeven aan <b>%(playerTo)s</b>"
+"<b>%(playerFrom)s</b> heeft een hint gegeven aan <b>%(playerTo)s</b>."
 
 #: templates/hanabi.html:214
 #, python-format
@@ -151,8 +151,8 @@ msgstr "Dit zijn al je kaarten met waarde <b>%(numValue)s</b>."
 #: templates/hanabi.html:216
 #, python-format
 msgid ""
-"You have no <span style=\\\"color: %(colourHex)s\\\">%(colourName)s</"
-"span> cards."
+"You have no <span style=\\\"color: %(colourHex)s\\\">%(colourName)s</span> "
+"cards."
 msgstr ""
 "Je hebt geen <span style=\\\"color: %(colourHex)s\\\">%(colourName)s</"
 "span> kaarten."
@@ -265,16 +265,15 @@ msgstr "Jouw handkaarten"
 #: templates/hanabi.html:450
 msgid ""
 "\n"
-"                        This is your hand. You're not allowed to see "
-"your own cards, so you'll have to rely on\n"
+"                        This is your hand. You're not allowed to see your "
+"own cards, so you'll have to rely on\n"
 "                            other player's hints for information!\n"
 "                        "
 msgstr ""
 "\n"
-"                        Dit zijn jouw handkaarten. Je mag niet in je "
-"eigen hand kijken, dus je bent\n"
-"                            afhankelijk van de hints van andere "
-"spelers!\n"
+"                        Dit zijn jouw handkaarten. Je mag niet in je eigen "
+"hand kijken, dus je bent\n"
+"                            afhankelijk van de hints van andere spelers!\n"
 "                        "
 
 #: templates/hanabi.html:456
@@ -304,8 +303,8 @@ msgid ""
 "            "
 msgstr ""
 "\n"
-"                Klik op de kaarten van een speler om hem/haar een hint "
-"te geven.\n"
+"                Klik op de kaarten van een speler om hem/haar een hint te "
+"geven.\n"
 "            "
 
 #: templates/hanabi.html:511
