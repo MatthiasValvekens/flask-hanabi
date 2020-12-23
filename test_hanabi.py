@@ -97,7 +97,7 @@ def create_player_in_session(client, sess: SessionData = None, name='tester') \
     )
 
 
-def test_create_destroy_session(client):
+def test_create_session(client):
     sess = create_session(client)
     exists_q = hanabi.HanabiSession.query.filter(
         hanabi.HanabiSession.id == sess.session_id
@@ -112,18 +112,6 @@ def test_create_destroy_session(client):
     # we shouldn't be able to start a game without first adding players
     response = client.post(sess.manage_url)
     assert response.status_code == 409, response.get_json()
-
-    response = client.delete(sess.manage_url)
-    assert response.status_code == 200, response.get_json()
-    with hanabi.app.app_context():
-        assert not hanabi.db.session.query(exists_q).scalar()
-
-    # ... and we shouldn't be able to operate on the session
-    # after it's been disposed
-    response = client.post(sess.manage_url)
-    assert response.status_code == 410, response.get_json()
-    response = client.get(sess.manage_url)
-    assert response.status_code == 410, response.get_json()
 
 
 # with the test seeds, this is how things are
@@ -261,6 +249,17 @@ def test_discard_one_card(client):
         client, 'post',
         gc1.play_url, data={'type': 'DISCARD', 'position': 1}
     )
+    # too many tokens
+    assert response.status_code == 400, response.get_json()
+
+    hanabi_session = hanabi.HanabiSession.query.get(sess.session_id)
+    hanabi_session.tokens_remaining -= 1
+    hanabi.db.session.commit()
+
+    response = request_json(
+        client, 'post',
+        gc1.play_url, data={'type': 'DISCARD', 'position': 1}
+    )
     assert response.status_code == 200, response.get_json()
     rdata = response.get_json()
     assert rdata['current_fireworks'] == [0, 0, 0, 0, 0]
@@ -274,6 +273,7 @@ def test_discard_one_card(client):
     assert rdata['players'][0]['hand'][1] is None
     assert rdata['current_fireworks'] == [0, 0, 0, 0, 0]
     assert rdata['errors_remaining'] == 3
+    assert rdata['tokens_remaining'] == 8
     assert rdata['active_player'] == gc1.player_id
     assert rdata['cards_remaining'] == 42
     action = rdata['last_action']
@@ -317,6 +317,7 @@ def test_give_num_value_hint(client):
     assert rdata['current_fireworks'] == [0, 0, 0, 0, 0]
     assert rdata['errors_remaining'] == 3
     assert rdata['active_player'] == gc1.player_id
+    assert rdata['tokens_remaining'] == 7
     action = rdata['last_action']
     assert action['type'] == 'HINT'
     assert action.get('colour', None) is None

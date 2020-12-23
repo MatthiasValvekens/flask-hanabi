@@ -490,7 +490,7 @@ export const hanabiController = function () {
         $('.errors-left').text(gameState.errorsRemaining);
         $('.tokens-left').text(gameState.tokensRemaining);
         $('.cards-left').text(gameState.cardsRemaining);
-        $('#discard-button').prop('disabled', gameState.tokensRemaining === 0);
+        $('#discard-button').prop('disabled', gameState.tokensRemaining === gameState.maxTokens);
     }
 
     function updateFireworks() {
@@ -575,6 +575,10 @@ export const hanabiController = function () {
 
     function handleHintModal() {
         if(gameState.isCurrentlyActive && gameState.status === GameStatus.PLAYER_THINKING) {
+            if(gameState.tokensRemaining === 0) {
+                $('#out-of-tokens-modal').addClass('is-active');
+                return;
+            }
             $('#hint-selection .hanabi-card').removeClass('hanabi-card-highlighted');
             const hintModal = $('#give-hint-modal');
             const theId = parseInt($(this).attr('data-player-id'));

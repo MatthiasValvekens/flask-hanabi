@@ -278,7 +278,8 @@
             <p>
                 {% trans %}
                     Would you like to play or discard this card?
-                    Discarding costs 1 token.
+                    Discarding awards 1 token (unless you already have
+                    the maximal number of tokens).
                 {% endtrans %}
             </p>
             <table class="table is-centered">
@@ -293,6 +294,18 @@
             </table>
             <button class="button is-primary" id="play-card-button">{% trans %}Play card{% endtrans %}</button>
             <button class="button is-danger" id="discard-button">{% trans %}Discard{% endtrans %}</button>
+        </section>
+    </div>
+</div>
+<div class="modal" id="out-of-tokens-modal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">{% trans %}Out of tokens!{% endtrans %}</p>
+            <button class="delete" aria-label="{% trans %}close{% endtrans %}"></button>
+        </header>
+        <section class="modal-card-body has-text-centered">
+            {% trans %}The team is out of hint tokens! Discard a card or complete a firework display to earn new ones.{% endtrans %}
         </section>
     </div>
 </div>
@@ -331,7 +344,6 @@
                 {% trans %}Give hint{% endtrans %}
             </button>
         </section>
-        {# TODO add widgets to select a hint #}
     </div>
 </div>
 <section class="section" id="start-section">

@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2020-12-23 18:11+0100\n"
-"PO-Revision-Date: 2020-12-23 18:12+0100\n"
+"POT-Creation-Date: 2020-12-23 22:42+0100\n"
+"PO-Revision-Date: 2020-12-23 22:44+0100\n"
 "Last-Translator: \n"
 "Language: nl\n"
 "Language-Team: nl <LL@li.org>\n"
@@ -173,7 +173,8 @@ msgstr "Klaar..."
 msgid "Play or discard this card?"
 msgstr "Deze kaart spelen of weggooien?"
 
-#: templates/hanabi.html:275 templates/hanabi.html:304
+#: templates/hanabi.html:275 templates/hanabi.html:305
+#: templates/hanabi.html:317
 msgid "close"
 msgstr "sluiten"
 
@@ -181,95 +182,109 @@ msgstr "sluiten"
 msgid ""
 "\n"
 "                    Would you like to play or discard this card?\n"
-"                    Discarding costs 1 token.\n"
+"                    Discarding awards 1 token (unless you already have\n"
+"                    the maximal number of tokens).\n"
 "                "
 msgstr ""
 "\n"
 "                    Wil je deze kaart spelen of weggooien?\n"
-"                    Weggooien kost 1 token.\n"
+"                    Een kaart weggooien levert je 1 token op (tenzij je al "
+"het maximaal aantal tokens hebt).\n"
 "                "
 
-#: templates/hanabi.html:286 templates/hanabi.html:484
+#: templates/hanabi.html:287 templates/hanabi.html:496
 msgid "Penalties left"
 msgstr "Resterende fouten"
 
-#: templates/hanabi.html:290 templates/hanabi.html:488
+#: templates/hanabi.html:291 templates/hanabi.html:500
 msgid "Tokens left"
 msgstr "Resterende tokens"
 
-#: templates/hanabi.html:294
+#: templates/hanabi.html:295
 msgid "Play card"
 msgstr "Kaart spelen"
 
-#: templates/hanabi.html:295
+#: templates/hanabi.html:296
 msgid "Discard"
 msgstr "Weggooien"
 
-#: templates/hanabi.html:303
+#: templates/hanabi.html:304
+msgid "Out of tokens!"
+msgstr "Tokens zijn op!"
+
+#: templates/hanabi.html:308
+msgid ""
+"The team is out of hint tokens! Discard a card or complete a firework "
+"display to earn new ones."
+msgstr ""
+"Het team heeft geen tokens meer om hints te geven! Gooi een kaart weg of "
+"vervolledig een stuk vuurwerk om nieuwe tokens te krijgen."
+
+#: templates/hanabi.html:316
 msgid "Give a hint to <b id=\"hint-recipient\"></b>?"
 msgstr "Een hint geven aan <b id=\"hint-recipient\"></b>?"
 
-#: templates/hanabi.html:310
+#: templates/hanabi.html:323
 msgid "Colour hint"
 msgstr "Kleurhint"
 
-#: templates/hanabi.html:320
+#: templates/hanabi.html:333
 msgid "Value hint"
 msgstr "Waardehint"
 
-#: templates/hanabi.html:331
+#: templates/hanabi.html:344
 msgid "Give hint"
 msgstr "Hint geven"
 
-#: templates/hanabi.html:364 templates/hanabi.html:368
+#: templates/hanabi.html:376 templates/hanabi.html:380
 msgid "Name"
 msgstr "Naam"
 
-#: templates/hanabi.html:366
+#: templates/hanabi.html:378
 msgid "Choose a username"
 msgstr "Kies een gebruikersnaam"
 
-#: templates/hanabi.html:379
+#: templates/hanabi.html:391
 msgid "Start new session"
 msgstr "Nieuwe sessie opstarten"
 
-#: templates/hanabi.html:381 templates/hanabi.html:404
+#: templates/hanabi.html:393 templates/hanabi.html:416
 msgid "Start"
 msgstr "Start"
 
-#: templates/hanabi.html:391
+#: templates/hanabi.html:403
 msgid "Join existing session"
 msgstr "Aansluiten bij lopende sessie"
 
-#: templates/hanabi.html:394
+#: templates/hanabi.html:406
 msgid "Invitation token"
 msgstr "Uitnodigingstoken"
 
-#: templates/hanabi.html:394 templates/hanabi.html:527
+#: templates/hanabi.html:406 templates/hanabi.html:539
 msgid "invitation token"
 msgstr "uitnodigingstoken"
 
-#: templates/hanabi.html:399
+#: templates/hanabi.html:411
 msgid "This invitation token is not valid."
 msgstr "Dit uitnodigingstoken is niet geldig."
 
-#: templates/hanabi.html:425
+#: templates/hanabi.html:437
 msgid "Current fireworks"
 msgstr "Huidige vuurpijlen"
 
-#: templates/hanabi.html:427
+#: templates/hanabi.html:439
 msgid "This is the current status of the firework show."
 msgstr "Dit is de status van de vuurwerkshow."
 
-#: templates/hanabi.html:437
+#: templates/hanabi.html:449
 msgid "Players"
 msgstr "Spelers"
 
-#: templates/hanabi.html:448
+#: templates/hanabi.html:460
 msgid "Your hand"
 msgstr "Jouw handkaarten"
 
-#: templates/hanabi.html:450
+#: templates/hanabi.html:462
 msgid ""
 "\n"
 "                        This is your hand. You're not allowed to see your "
@@ -283,7 +298,7 @@ msgstr ""
 "                            afhankelijk van de hints van andere spelers!\n"
 "                        "
 
-#: templates/hanabi.html:456
+#: templates/hanabi.html:468
 msgid ""
 "\n"
 "                            Click one of the cards below to play or discard "
@@ -295,38 +310,38 @@ msgstr ""
 "spelen of weg te gooien.\n"
 "                        "
 
-#: templates/hanabi.html:477
+#: templates/hanabi.html:489
 msgid "End turn"
 msgstr "Beurt beëindigen"
 
-#: templates/hanabi.html:492
+#: templates/hanabi.html:504
 msgid "Fireworks left"
 msgstr "Resterend vuurwerk"
 
-#: templates/hanabi.html:501
+#: templates/hanabi.html:513
 msgid "Click a player's hand to give them a hint."
 msgstr "Klik op de kaarten van een speler om hem/haar een hint te geven."
 
-#: templates/hanabi.html:509
+#: templates/hanabi.html:521
 msgid "Game over"
 msgstr "Game over"
 
-#: templates/hanabi.html:511
+#: templates/hanabi.html:523
 msgid "Total score"
 msgstr "Totale score"
 
-#: templates/hanabi.html:521
+#: templates/hanabi.html:533
 msgid "Management console"
 msgstr "Bedieningspaneel"
 
-#: templates/hanabi.html:532
+#: templates/hanabi.html:544
 msgid "Invitation token: click to copy"
 msgstr "Uitnodigingstoken: klik om te kopiëren"
 
-#: templates/hanabi.html:544
+#: templates/hanabi.html:556
 msgid "Start game"
 msgstr "Spel starten"
 
-#: templates/hanabi.html:547
+#: templates/hanabi.html:559
 msgid "Give up"
 msgstr "Opgeven"

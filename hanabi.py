@@ -101,12 +101,13 @@ class HanabiSession(db.Model):
         db.Integer, nullable=False,
         default=app.config['POST_ACTION_TIME_LIMIT_SECONDS']
     )
+    max_tokens = db.Column(
+        db.Integer, nullable=False, default=app.config['TOKEN_COUNT']
+    )
 
     players_present = db.Column(db.Integer, nullable=False, default=0)
     turn = db.Column(db.Integer, nullable=False, default=0)
-    tokens_remaining = db.Column(
-        db.Integer, nullable=False, default=app.config['TOKEN_COUNT']
-    )
+    tokens_remaining = db.Column(db.Integer, nullable=False, default=0)
     errors_remaining = db.Column(
         db.Integer, nullable=False, default=app.config['ERRORS_ALLOWED']
     )
@@ -438,7 +439,8 @@ def session_state(session_id: int, calling_player: int = None):
         'created': sess.created,
         'players': list(player_json_objects.values()),
         'colour_count': sess.colour_count,
-        'turn': sess.turn
+        'turn': sess.turn,
+        'max_tokens': sess.max_tokens
     }
     score = sess.final_score
     if not sess.game_running:
@@ -809,7 +811,7 @@ def play_card(session: HanabiSession, pos: int):
 
         # give back a token as a reward for completing a series
         if card_type.num_value == 5 \
-                and session.tokens_remaining < app.config['TOKEN_COUNT']:
+                and session.tokens_remaining < session.max_tokens:
             session.tokens_remaining += 1
     else:
         session.errors_remaining -= 1
@@ -827,14 +829,14 @@ def play_card(session: HanabiSession, pos: int):
 
 def discard_card(session: HanabiSession, pos: int):
     # first, figure out if the player is even allowed to discard
-    if not session.tokens_remaining:
-        raise ActionNotValid("No discarding tokens left to spend.")
+    if session.tokens_remaining == session.max_tokens:
+        raise ActionNotValid("Can't discard, must give hint")
 
     # take the card from the user's hand
     card_type = use_card(session, pos)
 
-    # consume a token
-    session.tokens_remaining -= 1
+    # award a token
+    session.tokens_remaining += 1
 
     # log action for consumption by other users
     log = ActionLog(
@@ -857,6 +859,9 @@ def give_hint(session: HanabiSession, target_player_id: int,
 
     if target_player_id == session.active_player_id:
         raise ActionNotValid("Self-hints are not allowed, silly.")
+
+    if not session.tokens_remaining:
+        raise ActionNotValid("No hint tokens remaining")
 
     player_q = Player.query.filter(
         and_(Player.id == target_player_id, Player.session_id == session.id)
@@ -887,6 +892,8 @@ def give_hint(session: HanabiSession, target_player_id: int,
         hint_positions=pos_string, hint_target=target_player_id,
     )
 
+    session.tokens_remaining -= 1
+
     finish_action(session, log)
 
 
@@ -901,7 +908,7 @@ def init_session(session: HanabiSession, pepper):
         model.query.filter(model.session_id == session.id).delete()
 
     hand_size = 4 if session.players_present in (2, 3) else 5
-    session.tokens_remaining = app.config['TOKEN_COUNT']
+    session.tokens_remaining = session.max_tokens
     session.errors_remaining = app.config['ERRORS_ALLOWED']
     session.final_score = None
     session.turn = 0

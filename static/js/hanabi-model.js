@@ -231,6 +231,7 @@ function parseAction(serverPlayerAction) {
  * @property {int} turn - Current turn
  * @property {int} cards_in_hand - No. of cards that players are allowed to hold
  * @property {int} errors_remaining - Errors remaining
+ * @property {int} max_tokens - Max token count
  * @property {int} tokens_remaining - Tokens remaining
  * @property {int} cards_remaining - Cards left in the deck
  * @property {int[]} current_fireworks - Current state of the fireworks
@@ -280,6 +281,8 @@ export class GameState {
         this._errorsRemaining = 0;
         /** @type {int} */
         this._tokensRemaining = 0;
+        /** @type {int} */
+        this._max_tokens = 0;
         /** @type {int} */
         this._cardsRemaining = 0;
 
@@ -339,6 +342,7 @@ export class GameState {
             this._tokensRemaining = serverUpdate.tokens_remaining;
             this._cardsRemaining = serverUpdate.cards_remaining;
             this._currentFireworks = serverUpdate.current_fireworks;
+            this._max_tokens = serverUpdate.max_tokens;
         }
         if(status === GameStatus.TURN_END) {
             this._currentAction = parseAction(serverUpdate.last_action);
@@ -391,6 +395,13 @@ export class GameState {
      */
     get tokensRemaining() {
         return this._tokensRemaining;
+    }
+
+    /**
+     * @return {int}
+     */
+    get maxTokens() {
+        return this._max_tokens;
     }
 
     /**
