@@ -221,6 +221,7 @@
                 $('#spawn-session').click(controller.triggerSessionSpawn);
                 $('#join-session').click(controller.joinExistingSession);
                 $('#manager-start-game').click(controller.startGame);
+                $('#manager-stop-game').click(controller.stopGame);
                 $('#discard-button').click(controller.executeDiscardAction);
                 $('#play-card-button').click(controller.executePlayAction);
                 $('#hint-submit').click(controller.submitHint);
@@ -541,6 +542,9 @@
                     </div>
                     <button id="manager-start-game" class="button is-primary" disabled>
                         {% trans %}Start game{% endtrans %}
+                    </button>
+                    <button id="manager-stop-game" class="button is-primary" style="display: none">
+                        {% trans %}Give up{% endtrans %}
                     </button>
                 </div>
             </div>

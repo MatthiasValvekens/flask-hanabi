@@ -683,6 +683,7 @@ def draw_card(session: HanabiSession, player_id, pepper):
 def stop_game(session: HanabiSession, score):
 
     session.active_player_id = None
+    session.stop_game_after = None
     session.end_turn_at = None
     session.need_draw = False
     session.final_score = score
@@ -900,6 +901,10 @@ def init_session(session: HanabiSession, pepper):
         model.query.filter(model.session_id == session.id).delete()
 
     hand_size = 4 if session.players_present in (2, 3) else 5
+    session.tokens_remaining = app.config['TOKEN_COUNT']
+    session.errors_remaining = app.config['ERRORS_ALLOWED']
+    session.final_score = None
+    session.turn = 0
     session.cards_in_hand = hand_size
 
     # insert initial fireworks
@@ -984,17 +989,17 @@ def manage_session(session_id, pepper, mgmt_token):
         _eot_heartbeat_tasks(session_id, pepper)
         return session_state(session_id)
     elif request.method == 'DELETE':
-        HanabiSession.query.filter(HanabiSession.id == session_id).delete()
-        db.session.commit()
+        # give up
+        sess: HanabiSession = HanabiSession.for_update(session_id)
+        stop_game(sess, 0)
         return jsonify({}), 200
 
     if request.method == 'POST':
         # game initialisation logic
 
         sess: HanabiSession = HanabiSession.for_update(session_id)
-        if sess.game_running:
-            # TODO provide a clean mechanism to stop the game and
-            #  start a new one in the same session.
+        # if the score is not None, treat it as a session reset
+        if sess.game_running and sess.final_score is None:
             # already initialised, nothing to do
             return jsonify({}), 200
 

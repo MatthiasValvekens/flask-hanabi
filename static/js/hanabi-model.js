@@ -244,6 +244,7 @@ function parseAction(serverPlayerAction) {
  * @property {boolean} gameStateAdvanced
  * @property {Player[]} playersJoining
  * @property {boolean} activePlayerChanged
+ * @property {boolean} gameReset
  */
 export class GameState {
     /**
@@ -324,14 +325,16 @@ export class GameState {
         const joining = newPlayerList.filter(({playerId}) => !oldIdSet.has(playerId));
         this._playerList = newPlayerList;
 
-        let gameStateAdvanced = this._status !== status || this._turn !== turn;
-        let activePlayerChanged = false;
+        let activePlayerChanged = this._turn !== turn;
+        let gameStateAdvanced = this._status !== status || activePlayerChanged;
+        let gameReset = this._status === GameStatus.GAME_OVER
+                            || status !== GameStatus.GAME_OVER;
+        if(gameReset) {
+            this._score = null;
+        }
         if(status !== GameStatus.INITIAL) {
             this._slotsInUse = serverUpdate.used_hand_slots;
-            if(this._activePlayerId !== serverUpdate.active_player) {
-                activePlayerChanged = true;
-                this._activePlayerId = serverUpdate.active_player;
-            }
+            this._activePlayerId = serverUpdate.active_player;
             this._errorsRemaining = serverUpdate.errors_remaining;
             this._tokensRemaining = serverUpdate.tokens_remaining;
             this._cardsRemaining = serverUpdate.cards_remaining;
@@ -351,7 +354,7 @@ export class GameState {
         }
         return {
             gameStateAdvanced: gameStateAdvanced, playersJoining: joining,
-            activePlayerChanged: activePlayerChanged
+            activePlayerChanged: activePlayerChanged, gameReset: gameReset
         };
     }
 

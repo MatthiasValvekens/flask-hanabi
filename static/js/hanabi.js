@@ -262,9 +262,14 @@ export const hanabiController = function () {
                 $('#hanabi-other-players').append(playerCardViews);
             }
 
+            // restore the UI if the game was reset
+            if(gameStateUpdate.gameReset) {
+                $('#game-section').show();
+                $('#game-over').hide();
+            }
+
             // update status box
             let statusString = HANABI_CONFIG.guiStrings.statusString(status);
-
             if(gameStateUpdate.activePlayerChanged) {
                 $('.hanabi-player-box.active-player').removeClass('active-player');
                 if(gameState.isCurrentlyActive) {
@@ -306,16 +311,23 @@ export const hanabiController = function () {
                 $('#score-flavour-text').text(HANABI_CONFIG.guiStrings.scoreFlavourText(score));
                 $('#game-section').hide();
                 $('#game-over').show();
+                if(sessionContext().isManager) {
+                    $('#manager-stop-game').hide();
+                }
             }
 
-            if(gameState.playerList.length >= 2 && status === GameStatus.INITIAL) {
-                $('#manager-start-game').prop("disabled", false);
+            if(sessionContext().isManager) {
+                if(gameState.isGameRunning) {
+                    const stop = $('#manager-stop-game');
+                    stop.prop("disabled", false);
+                    stop.show();
+                } else if (gameState.playerList.length >= 2) {
+                    $('#manager-start-game').prop("disabled", false);
+                }
             }
         }).always(function() {
             // reschedule the timer, also on failures
-            if(!gameState.isGameOver) {
-                heartbeatTimer = setTimeout(heartbeat, HANABI_CONFIG.heartbeatTimeout);
-            }
+            heartbeatTimer = setTimeout(heartbeat, HANABI_CONFIG.heartbeatTimeout);
             toggleBusy(false);
         });
     }
@@ -339,9 +351,12 @@ export const hanabiController = function () {
 
     function startGame() {
         $('#manager-start-game').prop("disabled", true);
-        return callHanabiApi('POST', sessionContext().mgmtEndpoint, {}, function () {
-            forceRefresh();
-        });
+        return callHanabiApi('POST', sessionContext().mgmtEndpoint, null, forceRefresh);
+    }
+
+    function stopGame() {
+        $('#manager-stop-game').prop("disabled", true);
+        return callHanabiApi('DELETE', sessionContext().mgmtEndpoint, null, forceRefresh);
     }
 
     /**
@@ -482,6 +497,8 @@ export const hanabiController = function () {
                 $(this).html(`<span>${thisFireworkValue}</span>`);
             } else {
                 $(this).addClass("hanabi-empty-slot");
+                $(this).attr("data-hanabi-num-value", 0);
+                $(this).html('');
             }
         });
     }
@@ -663,6 +680,6 @@ export const hanabiController = function () {
         executePlayAction: (() => executeCardAction(false)),
         executeDiscardAction: (() => executeCardAction(true)),
         endTurn: endTurn, updateHintUI: updateHintUI,
-        submitHint: submitHint
+        submitHint: submitHint, stopGame: stopGame
     }
 }();
