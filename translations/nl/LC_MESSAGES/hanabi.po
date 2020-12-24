@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2020-12-23 22:42+0100\n"
-"PO-Revision-Date: 2020-12-23 22:44+0100\n"
+"POT-Creation-Date: 2020-12-24 13:18+0100\n"
+"PO-Revision-Date: 2020-12-24 13:19+0100\n"
 "Last-Translator: \n"
 "Language: nl\n"
 "Language-Team: nl <LL@li.org>\n"
@@ -19,97 +19,101 @@ msgstr ""
 "Generated-By: Babel 2.9.0\n"
 "X-Generator: Poedit 2.3\n"
 
-#: templates/hanabi.html:136
+#: templates/hanabi.html:211
 msgid "playing"
 msgstr "aan de beurt"
 
-#: templates/hanabi.html:169
+#: templates/hanabi.html:244
 msgid "green"
 msgstr "groene"
 
-#: templates/hanabi.html:170
+#: templates/hanabi.html:245
 msgid "red"
 msgstr "rode"
 
-#: templates/hanabi.html:171
+#: templates/hanabi.html:246
 msgid "orange"
 msgstr "oranje"
 
-#: templates/hanabi.html:172
+#: templates/hanabi.html:247
 msgid "purple"
 msgstr "paarse"
 
-#: templates/hanabi.html:173
+#: templates/hanabi.html:248
 msgid "blue"
 msgstr "blauwe"
 
-#: templates/hanabi.html:178
+#: templates/hanabi.html:253
 msgid "Waiting for players to join..."
 msgstr "Wachten op spelers..."
 
-#: templates/hanabi.html:180
+#: templates/hanabi.html:255
 msgid "Waiting for player to act..."
 msgstr "Wachten tot speler iets doet..."
 
-#: templates/hanabi.html:182
+#: templates/hanabi.html:257
 msgid "Waiting for player to end turn..."
 msgstr "Wachten op einde beurt..."
 
-#: templates/hanabi.html:184
+#: templates/hanabi.html:259
 msgid "The results are in!"
 msgstr "De resultaten zijn binnen!"
 
-#: templates/hanabi.html:191
+#: templates/hanabi.html:266
 msgid "The crowd wants their money back!"
 msgstr "De mensen willen hun geld terug!"
 
-#: templates/hanabi.html:193
+#: templates/hanabi.html:268
 msgid "The crowd's reaction is tepid."
 msgstr "De menigte reageert nogal lauw."
 
-#: templates/hanabi.html:195
+#: templates/hanabi.html:270
 msgid "The crowd appears to be satisfied."
 msgstr "Het publiek is tevreden."
 
-#: templates/hanabi.html:197
+#: templates/hanabi.html:272
 msgid "The crowd is pleased!"
 msgstr "Het publiek is onder de indruk!"
 
-#: templates/hanabi.html:199
+#: templates/hanabi.html:274
 msgid "The crowd is enthousiastic!"
 msgstr "Het publiek is enthousiast!"
 
-#: templates/hanabi.html:201
+#: templates/hanabi.html:276
 msgid "Legendary!! The crowd goes absolutely bananas!"
 msgstr "Legendarisch!! De menigte gaat helemaal uit haar dak!"
 
-#: templates/hanabi.html:204
+#: templates/hanabi.html:279
 msgid "Card played"
 msgstr "Gespeelde kaart"
 
-#: templates/hanabi.html:205
+#: templates/hanabi.html:280
 msgid "Hint given"
 msgstr "Gegeven hint"
 
-#: templates/hanabi.html:206
+#: templates/hanabi.html:281
 msgid "Card discarded"
 msgstr "Weggegooide kaart"
 
-#: templates/hanabi.html:207
+#: templates/hanabi.html:282
 msgid "It's your turn!"
 msgstr "Het is aan jou!"
 
-#: templates/hanabi.html:208
+#: templates/hanabi.html:283
+msgid "The next player will get to play in a few moments..."
+msgstr "Over enkele ogenblikken is de volgende speler aan de beurt..."
+
+#: templates/hanabi.html:284
 #, python-format
 msgid "<b>%(player)s</b> successfully played a card."
 msgstr "<b>%(player)s</b> heeft met succes een kaart gespeeld."
 
-#: templates/hanabi.html:209
+#: templates/hanabi.html:285
 #, python-format
 msgid "<b>%(player)s</b> made a mistake."
 msgstr "<b>%(player)s</b> heeft een fout gemaakt."
 
-#: templates/hanabi.html:210
+#: templates/hanabi.html:286
 #, python-format
 msgid ""
 "The <span style=\\\"color: %(colourHex)s\\\">%(colourName)s %(numValue)s</"
@@ -118,7 +122,7 @@ msgstr ""
 "De <span style=\\\"color: %(colourHex)s\\\">%(colourName)s %(numValue)s</"
 "span> gaat in tegen de flow van de vuurwerkshow. Ai!"
 
-#: templates/hanabi.html:211
+#: templates/hanabi.html:287
 #, python-format
 msgid ""
 "The <span style=\\\"color: %(colourHex)s\\\">%(colourName)s %(numValue)s</"
@@ -127,17 +131,17 @@ msgstr ""
 "De nachthemel licht op door de <span style=\\\"color: %(colourHex)s\\\">"
 "%(colourName)s %(numValue)s</span>!"
 
-#: templates/hanabi.html:212
+#: templates/hanabi.html:288
 #, python-format
 msgid "<b>%(player)s</b> discarded a card."
 msgstr "<b>%(player)s</b> heeft een kaart weggegooid."
 
-#: templates/hanabi.html:213
+#: templates/hanabi.html:289
 #, python-format
 msgid "<b>%(playerFrom)s</b> gave a hint to <b>%(playerTo)s</b>."
 msgstr "<b>%(playerFrom)s</b> heeft een hint gegeven aan <b>%(playerTo)s</b>."
 
-#: templates/hanabi.html:214
+#: templates/hanabi.html:290
 #, python-format
 msgid ""
 "These are your <span style=\\\"color: %(colourHex)s\\\">%(colourName)s</"
@@ -146,12 +150,12 @@ msgstr ""
 "Dit zijn al je <span style=\\\"color: %(colourHex)s\\\">%(colourName)s</"
 "span> kaarten."
 
-#: templates/hanabi.html:215
+#: templates/hanabi.html:291
 #, python-format
 msgid "These are your cards with value <b>%(numValue)s</b>."
 msgstr "Dit zijn al je kaarten met waarde <b>%(numValue)s</b>."
 
-#: templates/hanabi.html:216
+#: templates/hanabi.html:292
 #, python-format
 msgid ""
 "You have no <span style=\\\"color: %(colourHex)s\\\">%(colourName)s</span> "
@@ -160,25 +164,29 @@ msgstr ""
 "Je hebt geen <span style=\\\"color: %(colourHex)s\\\">%(colourName)s</span> "
 "kaarten."
 
-#: templates/hanabi.html:217
+#: templates/hanabi.html:293
 #, python-format
 msgid "You have no cards with value <b>%(numValue)s</b>."
 msgstr "Je hebt geen kaarten met waarde <b>%(numValue)s</b>."
 
-#: templates/hanabi.html:218
+#: templates/hanabi.html:294
 msgid "Standing by..."
 msgstr "Klaar..."
 
-#: templates/hanabi.html:274
+#: templates/hanabi.html:345
+msgid "Your turn"
+msgstr "Jouw beurt"
+
+#: templates/hanabi.html:351
 msgid "Play or discard this card?"
 msgstr "Deze kaart spelen of weggooien?"
 
-#: templates/hanabi.html:275 templates/hanabi.html:305
-#: templates/hanabi.html:317
+#: templates/hanabi.html:352 templates/hanabi.html:382
+#: templates/hanabi.html:394
 msgid "close"
 msgstr "sluiten"
 
-#: templates/hanabi.html:279
+#: templates/hanabi.html:356
 msgid ""
 "\n"
 "                    Would you like to play or discard this card?\n"
@@ -192,27 +200,27 @@ msgstr ""
 "het maximaal aantal tokens hebt).\n"
 "                "
 
-#: templates/hanabi.html:287 templates/hanabi.html:496
+#: templates/hanabi.html:364 templates/hanabi.html:572
 msgid "Penalties left"
 msgstr "Resterende fouten"
 
-#: templates/hanabi.html:291 templates/hanabi.html:500
+#: templates/hanabi.html:368 templates/hanabi.html:576
 msgid "Tokens left"
 msgstr "Resterende tokens"
 
-#: templates/hanabi.html:295
+#: templates/hanabi.html:372
 msgid "Play card"
 msgstr "Kaart spelen"
 
-#: templates/hanabi.html:296
+#: templates/hanabi.html:373
 msgid "Discard"
 msgstr "Weggooien"
 
-#: templates/hanabi.html:304
+#: templates/hanabi.html:381
 msgid "Out of tokens!"
 msgstr "Tokens zijn op!"
 
-#: templates/hanabi.html:308
+#: templates/hanabi.html:385
 msgid ""
 "The team is out of hint tokens! Discard a card or complete a firework "
 "display to earn new ones."
@@ -220,71 +228,71 @@ msgstr ""
 "Het team heeft geen tokens meer om hints te geven! Gooi een kaart weg of "
 "vervolledig een stuk vuurwerk om nieuwe tokens te krijgen."
 
-#: templates/hanabi.html:316
+#: templates/hanabi.html:393
 msgid "Give a hint to <b id=\"hint-recipient\"></b>?"
 msgstr "Een hint geven aan <b id=\"hint-recipient\"></b>?"
 
-#: templates/hanabi.html:323
+#: templates/hanabi.html:400
 msgid "Colour hint"
 msgstr "Kleurhint"
 
-#: templates/hanabi.html:333
+#: templates/hanabi.html:410
 msgid "Value hint"
 msgstr "Waardehint"
 
-#: templates/hanabi.html:344
+#: templates/hanabi.html:421
 msgid "Give hint"
 msgstr "Hint geven"
 
-#: templates/hanabi.html:376 templates/hanabi.html:380
+#: templates/hanabi.html:453 templates/hanabi.html:457
 msgid "Name"
 msgstr "Naam"
 
-#: templates/hanabi.html:378
+#: templates/hanabi.html:455
 msgid "Choose a username"
 msgstr "Kies een gebruikersnaam"
 
-#: templates/hanabi.html:391
+#: templates/hanabi.html:468
 msgid "Start new session"
 msgstr "Nieuwe sessie opstarten"
 
-#: templates/hanabi.html:393 templates/hanabi.html:416
+#: templates/hanabi.html:470 templates/hanabi.html:493
 msgid "Start"
 msgstr "Start"
 
-#: templates/hanabi.html:403
+#: templates/hanabi.html:480
 msgid "Join existing session"
 msgstr "Aansluiten bij lopende sessie"
 
-#: templates/hanabi.html:406
+#: templates/hanabi.html:483
 msgid "Invitation token"
 msgstr "Uitnodigingstoken"
 
-#: templates/hanabi.html:406 templates/hanabi.html:539
+#: templates/hanabi.html:483 templates/hanabi.html:615
 msgid "invitation token"
 msgstr "uitnodigingstoken"
 
-#: templates/hanabi.html:411
+#: templates/hanabi.html:488
 msgid "This invitation token is not valid."
 msgstr "Dit uitnodigingstoken is niet geldig."
 
-#: templates/hanabi.html:437
+#: templates/hanabi.html:514
 msgid "Current fireworks"
 msgstr "Huidige vuurpijlen"
 
-#: templates/hanabi.html:439
+#: templates/hanabi.html:516
 msgid "This is the current status of the firework show."
 msgstr "Dit is de status van de vuurwerkshow."
 
-#: templates/hanabi.html:449
+#: templates/hanabi.html:526
 msgid "Players"
 msgstr "Spelers"
 
-#: templates/hanabi.html:460
+#: templates/hanabi.html:536
 msgid "Your hand"
 msgstr "Jouw handkaarten"
 
-#: templates/hanabi.html:462
+#: templates/hanabi.html:538
 msgid ""
 "\n"
 "                        This is your hand. You're not allowed to see your "
@@ -298,7 +306,7 @@ msgstr ""
 "                            afhankelijk van de hints van andere spelers!\n"
 "                        "
 
-#: templates/hanabi.html:468
+#: templates/hanabi.html:544
 msgid ""
 "\n"
 "                            Click one of the cards below to play or discard "
@@ -310,38 +318,38 @@ msgstr ""
 "spelen of weg te gooien.\n"
 "                        "
 
-#: templates/hanabi.html:489
+#: templates/hanabi.html:565
 msgid "End turn"
 msgstr "Beurt beëindigen"
 
-#: templates/hanabi.html:504
+#: templates/hanabi.html:580
 msgid "Fireworks left"
 msgstr "Resterend vuurwerk"
 
-#: templates/hanabi.html:513
+#: templates/hanabi.html:589
 msgid "Click a player's hand to give them a hint."
 msgstr "Klik op de kaarten van een speler om hem/haar een hint te geven."
 
-#: templates/hanabi.html:521
+#: templates/hanabi.html:597
 msgid "Game over"
 msgstr "Game over"
 
-#: templates/hanabi.html:523
+#: templates/hanabi.html:599
 msgid "Total score"
 msgstr "Totale score"
 
-#: templates/hanabi.html:533
+#: templates/hanabi.html:609
 msgid "Management console"
 msgstr "Bedieningspaneel"
 
-#: templates/hanabi.html:544
+#: templates/hanabi.html:620
 msgid "Invitation token: click to copy"
 msgstr "Uitnodigingstoken: klik om te kopiëren"
 
-#: templates/hanabi.html:556
+#: templates/hanabi.html:632
 msgid "Start game"
 msgstr "Spel starten"
 
-#: templates/hanabi.html:559
+#: templates/hanabi.html:635
 msgid "Give up"
 msgstr "Opgeven"
