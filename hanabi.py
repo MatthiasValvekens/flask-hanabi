@@ -110,7 +110,7 @@ class HanabiSession(db.Model):
     )
 
     players_present = db.Column(db.Integer, nullable=False, default=0)
-    turn = db.Column(db.Integer, nullable=False, default=0)
+    turn = db.Column(db.Integer, nullable=True)
     tokens_remaining = db.Column(db.Integer, nullable=False, default=0)
     errors_remaining = db.Column(
         db.Integer, nullable=False, default=app.config['ERRORS_ALLOWED']

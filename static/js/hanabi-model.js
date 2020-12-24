@@ -286,8 +286,8 @@ export class GameState {
         /** @type {int} */
         this._cardsRemaining = 0;
 
-        /** @type {int} */
-        this._turn = 0;
+        /** @type {?int} */
+        this._turn = null;
 
         /** @type {?int} */
         this._score = null;
