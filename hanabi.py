@@ -911,7 +911,7 @@ def init_session(session: HanabiSession, pepper):
     for model in (DeckReserve, Fireworks, ActionLog, HeldCard):
         model.query.filter(model.session_id == session.id).delete()
 
-    hand_size = 4 if session.players_present in (2, 3) else 5
+    hand_size = 5 if session.players_present in (2, 3) else 4
     session.tokens_remaining = session.max_tokens
     session.errors_remaining = app.config['ERRORS_ALLOWED']
     session.final_score = None
