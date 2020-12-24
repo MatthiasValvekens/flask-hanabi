@@ -281,16 +281,16 @@
             cardDiscarded: "{% trans %}Card discarded{% endtrans %}",
             itsYourTurn: "{% trans %}It's your turn!{% endtrans %}",
             endOfTurnWait: "{% trans %}The next player will get to play in a few moments...{% endtrans %}",
-            playerUsedACard: "{% trans %}<b>%(player)s</b> successfully played a card.{% endtrans %}",
-            playerMadeAMistake: "{% trans %}<b>%(player)s</b> made a mistake.{% endtrans %}",
-            mistakeDescription: "{% trans %}The <span style=\"color: %(colourHex)s\">%(colourName)s %(numValue)s</span> disturbs the flow of the firework show. Oh no!{% endtrans %}",
-            successDescription: "{% trans %}The <span style=\"color: %(colourHex)s\">%(colourName)s %(numValue)s</span> lights up the night sky!{% endtrans %}",
-            playerDiscardedACard: "{% trans %}<b>%(player)s</b> discarded a card.{% endtrans %}",
-            playerGaveAHint: "{% trans %}<b>%(playerFrom)s</b> gave a hint to <b>%(playerTo)s</b>.{% endtrans %}",
-            markedCardsOfColour: "{% trans %}These are your <span style=\"color: %(colourHex)s\">%(colourName)s</span> cards.{% endtrans %}",
-            markedCardsOfValue: "{% trans %}These are your cards with value <b>%(numValue)s</b>.{% endtrans %}",
-            noCardsOfColour: "{% trans %}You have no <span style=\"color: %(colourHex)s\">%(colourName)s</span> cards.{% endtrans %}",
-            noCardsOfValue: "{% trans %}You have no cards with value <b>%(numValue)s</b>.{% endtrans %}",
+            playerUsedACard: "{% trans %}<b>&(player)s</b> successfully played a card.{% endtrans %}",
+            playerMadeAMistake: "{% trans %}<b>&(player)s</b> made a mistake.{% endtrans %}",
+            mistakeDescription: '{% trans %}The <span style="color: &(colourHex)s">&(colourName)s &(numValue)s</span> disturbs the flow of the firework show. Oh no!{% endtrans %}',
+            successDescription: '{% trans %}The <span style="color: &(colourHex)s">&(colourName)s &(numValue)s</span> lights up the night sky!{% endtrans %}',
+            playerDiscardedACard: "{% trans %}<b>&(player)s</b> discarded a card.{% endtrans %}",
+            playerGaveAHint: "{% trans %}<b>&(playerFrom)s</b> gave a hint to <b>&(playerTo)s</b>.{% endtrans %}",
+            markedCardsOfColour: '{% trans %}These are your <span style="color: &(colourHex)s">&(colourName)s</span> cards.{% endtrans %}',
+            markedCardsOfValue: "{% trans %}These are your cards with value <b>&(numValue)s</b>.{% endtrans %}",
+            noCardsOfColour: '{% trans %}You have no <span style="color: &(colourHex)s">&(colourName)s</span> cards.{% endtrans %}',
+            noCardsOfValue: "{% trans %}You have no cards with value <b>&(numValue)s</b>.{% endtrans %}",
             playerStandby: "{% trans %}Standing by...{% endtrans %}",
         };
         $(document).ready(
@@ -353,7 +353,7 @@
         </header>
         <section class="modal-card-body has-text-centered">
             <p>
-                {% trans %}
+                {% trans trimmed %}
                     Would you like to play or discard this card?
                     Discarding awards 1 token (unless you already have
                     the maximal number of tokens).
@@ -535,13 +535,13 @@
                 <div class="column is-8 has-text-centered">
                     <h6 class="has-text-weight-bold has-text-centered">{% trans %}Your hand{% endtrans %}</h6>
                     <p>
-                        {% trans %}
+                        {% trans trimmed %}
                         This is your hand. You're not allowed to see your own cards, so you'll have to rely on
-                            other player's hints for information!
+                        other player's hints for information!
                         {% endtrans %}
                     </p>
                     <p class="only-when-active has-text-weight-bold" style="visibility: hidden">
-                        {% trans %}
+                        {% trans trimmed %}
                             Click one of the cards below to play or discard it.
                         {% endtrans %}
                     </p>

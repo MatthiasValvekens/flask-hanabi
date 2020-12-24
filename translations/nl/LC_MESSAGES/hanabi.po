@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2020-12-24 13:18+0100\n"
-"PO-Revision-Date: 2020-12-24 13:19+0100\n"
+"POT-Creation-Date: 2020-12-24 15:31+0100\n"
+"PO-Revision-Date: 2020-12-24 15:34+0100\n"
 "Last-Translator: \n"
 "Language: nl\n"
 "Language-Team: nl <LL@li.org>\n"
@@ -105,69 +105,69 @@ msgstr "Over enkele ogenblikken is de volgende speler aan de beurt..."
 
 #: templates/hanabi.html:284
 #, python-format
-msgid "<b>%(player)s</b> successfully played a card."
-msgstr "<b>%(player)s</b> heeft met succes een kaart gespeeld."
+msgid "<b>&(player)s</b> successfully played a card."
+msgstr "<b>&(player)s</b> heeft met succes een kaart gespeeld."
 
 #: templates/hanabi.html:285
 #, python-format
-msgid "<b>%(player)s</b> made a mistake."
-msgstr "<b>%(player)s</b> heeft een fout gemaakt."
+msgid "<b>&(player)s</b> made a mistake."
+msgstr "<b>&(player)s</b> heeft een fout gemaakt."
 
 #: templates/hanabi.html:286
 #, python-format
 msgid ""
-"The <span style=\\\"color: %(colourHex)s\\\">%(colourName)s %(numValue)s</"
-"span> disturbs the flow of the firework show. Oh no!"
+"The <span style=\"color: &(colourHex)s\">&(colourName)s &(numValue)s</span> "
+"disturbs the flow of the firework show. Oh no!"
 msgstr ""
-"De <span style=\\\"color: %(colourHex)s\\\">%(colourName)s %(numValue)s</"
-"span> gaat in tegen de flow van de vuurwerkshow. Ai!"
+"De <span style=\"color: &(colourHex)s\">&(colourName)s &(numValue)s</span> "
+"gaat in tegen de flow van de vuurwerkshow. Ai!"
 
 #: templates/hanabi.html:287
 #, python-format
 msgid ""
-"The <span style=\\\"color: %(colourHex)s\\\">%(colourName)s %(numValue)s</"
-"span> lights up the night sky!"
+"The <span style=\"color: &(colourHex)s\">&(colourName)s &(numValue)s</span> "
+"lights up the night sky!"
 msgstr ""
-"De nachthemel licht op door de <span style=\\\"color: %(colourHex)s\\\">"
-"%(colourName)s %(numValue)s</span>!"
+"De nachthemel licht op door de <span style=\"color: &(colourHex)s"
+"\">&(colourName)s &(numValue)s</span>!"
 
 #: templates/hanabi.html:288
 #, python-format
-msgid "<b>%(player)s</b> discarded a card."
-msgstr "<b>%(player)s</b> heeft een kaart weggegooid."
+msgid "<b>&(player)s</b> discarded a card."
+msgstr "<b>&(player)s</b> heeft een kaart weggegooid."
 
 #: templates/hanabi.html:289
 #, python-format
-msgid "<b>%(playerFrom)s</b> gave a hint to <b>%(playerTo)s</b>."
-msgstr "<b>%(playerFrom)s</b> heeft een hint gegeven aan <b>%(playerTo)s</b>."
+msgid "<b>&(playerFrom)s</b> gave a hint to <b>&(playerTo)s</b>."
+msgstr "<b>&(playerFrom)s</b> heeft een hint gegeven aan <b>&(playerTo)s</b>."
 
 #: templates/hanabi.html:290
 #, python-format
 msgid ""
-"These are your <span style=\\\"color: %(colourHex)s\\\">%(colourName)s</"
-"span> cards."
+"These are your <span style=\"color: &(colourHex)s\">&(colourName)s</span> "
+"cards."
 msgstr ""
-"Dit zijn al je <span style=\\\"color: %(colourHex)s\\\">%(colourName)s</"
-"span> kaarten."
+"Dit zijn al je <span style=\"color: &(colourHex)s\">&(colourName)s</span> "
+"kaarten."
 
 #: templates/hanabi.html:291
 #, python-format
-msgid "These are your cards with value <b>%(numValue)s</b>."
-msgstr "Dit zijn al je kaarten met waarde <b>%(numValue)s</b>."
+msgid "These are your cards with value <b>&(numValue)s</b>."
+msgstr "Dit zijn al je kaarten met waarde <b>&(numValue)s</b>."
 
 #: templates/hanabi.html:292
 #, python-format
 msgid ""
-"You have no <span style=\\\"color: %(colourHex)s\\\">%(colourName)s</span> "
+"You have no <span style=\"color: &(colourHex)s\">&(colourName)s</span> "
 "cards."
 msgstr ""
-"Je hebt geen <span style=\\\"color: %(colourHex)s\\\">%(colourName)s</span> "
+"Je hebt geen <span style=\"color: &(colourHex)s\">&(colourName)s</span> "
 "kaarten."
 
 #: templates/hanabi.html:293
 #, python-format
-msgid "You have no cards with value <b>%(numValue)s</b>."
-msgstr "Je hebt geen kaarten met waarde <b>%(numValue)s</b>."
+msgid "You have no cards with value <b>&(numValue)s</b>."
+msgstr "Je hebt geen kaarten met waarde <b>&(numValue)s</b>."
 
 #: templates/hanabi.html:294
 msgid "Standing by..."
@@ -188,17 +188,11 @@ msgstr "sluiten"
 
 #: templates/hanabi.html:356
 msgid ""
-"\n"
-"                    Would you like to play or discard this card?\n"
-"                    Discarding awards 1 token (unless you already have\n"
-"                    the maximal number of tokens).\n"
-"                "
+"Would you like to play or discard this card? Discarding awards 1 token "
+"(unless you already have the maximal number of tokens)."
 msgstr ""
-"\n"
-"                    Wil je deze kaart spelen of weggooien?\n"
-"                    Een kaart weggooien levert je 1 token op (tenzij je al "
-"het maximaal aantal tokens hebt).\n"
-"                "
+"Wil je deze kaart spelen of weggooien? Een kaart weggooien levert je 1 "
+"token op (tenzij je al het maximaal aantal tokens hebt)."
 
 #: templates/hanabi.html:364 templates/hanabi.html:572
 msgid "Penalties left"
@@ -294,29 +288,15 @@ msgstr "Jouw handkaarten"
 
 #: templates/hanabi.html:538
 msgid ""
-"\n"
-"                        This is your hand. You're not allowed to see your "
-"own cards, so you'll have to rely on\n"
-"                            other player's hints for information!\n"
-"                        "
+"This is your hand. You're not allowed to see your own cards, so you'll have "
+"to rely on other player's hints for information!"
 msgstr ""
-"\n"
-"                        Dit zijn jouw handkaarten. Je mag niet in je eigen "
-"hand kijken, dus je bent\n"
-"                            afhankelijk van de hints van andere spelers!\n"
-"                        "
+"Dit zijn jouw handkaarten. Je mag niet in je eigen hand kijken, dus je bent "
+"afhankelijk van de hints van andere spelers!"
 
 #: templates/hanabi.html:544
-msgid ""
-"\n"
-"                            Click one of the cards below to play or discard "
-"it.\n"
-"                        "
-msgstr ""
-"\n"
-"                            Kies één van de onderstaande kaarten om te "
-"spelen of weg te gooien.\n"
-"                        "
+msgid "Click one of the cards below to play or discard it."
+msgstr "Kies één van de onderstaande kaarten om te spelen of weg te gooien."
 
 #: templates/hanabi.html:565
 msgid "End turn"

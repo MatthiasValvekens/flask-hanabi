@@ -46,7 +46,8 @@ export const HANABI_CONFIG = {
 
 export function pseudoPythonInterpolate(fmt, obj) {
     // based on noice one-liner from here: https://code.djangoproject.com/ticket/4414
-    return fmt.replace(/%\(\w+\)s/g, function(match){return String(obj[match.slice(2,-2)])});
+    // % replaced with & to avoid confusing Jinja2's gettext wrappers
+    return fmt.replace(/&\(\w+\)s/g, function(match){return String(obj[match.slice(2,-2)])});
 }
 
 export const hanabiController = function () {
