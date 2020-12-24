@@ -269,6 +269,10 @@ export class GameState {
         this._playerNamesById = Object();
         /** @type {int[]} */
         this._currentFireworks = [];
+
+        /** @type {boolean[]} */
+        this._oldSlotsInUse = [];
+
         /** @type {boolean[]} */
         this._slotsInUse = [];
         /** @type {?int} */
@@ -336,7 +340,15 @@ export class GameState {
             this._score = null;
         }
         if(status !== GameStatus.INITIAL) {
-            this._slotsInUse = serverUpdate.used_hand_slots;
+            if(this._status === GameStatus.INITIAL) {
+                // game just started: all cards are new
+                this._oldSlotsInUse = serverUpdate.used_hand_slots
+                    .map(() => false);
+                this._slotsInUse = serverUpdate.used_hand_slots;
+            } else if(gameStateAdvanced) {
+                this._oldSlotsInUse = this._slotsInUse;
+                this._slotsInUse = serverUpdate.used_hand_slots;
+            }
             this._activePlayerId = serverUpdate.active_player;
             this._errorsRemaining = serverUpdate.errors_remaining;
             this._tokensRemaining = serverUpdate.tokens_remaining;
@@ -433,10 +445,14 @@ export class GameState {
     }
 
     /**
-     * @return {boolean[]}
+     * @return {{inUse: boolean, wasInUse: boolean}[]}
      */
     get slotsInUse() {
-        return this._slotsInUse;
+        return this._slotsInUse.map(
+            (status, ix) => ({
+                inUse: status, wasInUse: this._oldSlotsInUse[ix]
+            })
+        );
     }
 
     /**

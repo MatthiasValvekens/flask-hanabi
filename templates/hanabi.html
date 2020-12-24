@@ -102,6 +102,23 @@
             padding: 0.4em;
         }
 
+        .new-card {
+            animation: fadein 2s;
+        }
+
+        @keyframes fadein {
+            from {
+                opacity: 0;
+
+                border-style: dashed;
+                border-width: 0.1em;
+                padding: 0.4em;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
         .hanabi-card.hanabi-card-highlighted {
             box-shadow: 0.3em 0.3em 1px #888888;
         }

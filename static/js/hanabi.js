@@ -288,7 +288,7 @@ export const hanabiController = function () {
                     let filter = `[data-player-id="${gameState.activePlayerId}"]`;
                     $(`#hanabi-other-players .hanabi-player-box${filter}`).addClass("active-player");
                     $('.only-when-active').css('visibility', 'hidden');
-                    $('#player-hand .hanabi-card').removeClass('clickable');
+                    $('#player-hand').removeClass('clickable');
                     $('#hanabi-other-players .hanabi-player-box').removeClass('clickable');
                 }
             }
@@ -552,8 +552,8 @@ export const hanabiController = function () {
 
     function updatePlayerHands() {
         let playerHandFmt = gameState.slotsInUse.map(
-            function(inUse, index) {
-                if(!inUse) {
+            function(status, index) {
+                if(!status.inUse) {
                     return emptySlot;
                 }
                 let act = gameState.currentAction;
@@ -563,7 +563,7 @@ export const hanabiController = function () {
                 if(highlight) {
                     return formatHintCard(/** @type {HintAction} */ act.action);
                 } else {
-                    return `<div class="hanabi-card hanabi-state">
+                    return `<div class="hanabi-card hanabi-state${status.wasInUse ? "" : " new-card"}">
                         <span>?</span>
                     </div>`
                 }
