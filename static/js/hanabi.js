@@ -299,6 +299,7 @@ export const hanabiController = function () {
                 $('#status-box').text(statusString);
                 if(gameState.isGameRunning) {
                     $('.standby-message').remove();
+                    $('#discarded-cards-button').prop("disabled", false);
                     updateFireworks();
                     updatePlayerHands();
                     updateCounters();
@@ -708,6 +709,30 @@ export const hanabiController = function () {
         );
     }
 
+    function showDiscarded() {
+        $('#discarded-cards-button').addClass("is-loading").prop("disabled", true);
+        hanabiAPIGet(playerContext().playEndpoint + '/discarded',
+            /**
+             * @param {{discarded: ServerCard[]}} response
+             */
+            function(response) {
+                const discarded = response.discarded;
+                let fmtd = '';
+                if(!discarded.length) {
+                    $('#no-discarded-cards').show();
+                } else {
+                    $('#no-discarded-cards').hide();
+                    fmtd = discarded.map(
+                        ({colour, num_value}) => formatCard(colour, num_value)
+                    ).join('');
+                }
+                $('#discarded-card-list').html(fmtd);
+                $('#discarded-card-modal').addClass("is-active");
+        }).always(function() {
+            $('#discarded-cards-button').removeClass("is-loading").prop("disabled", false);
+        });
+    }
+
     return {
         joinExistingSession: joinExistingSession,
         triggerSessionSpawn: triggerSessionSpawn, startGame: startGame,
@@ -715,6 +740,6 @@ export const hanabiController = function () {
         executePlayAction: (() => executeCardAction(false)),
         executeDiscardAction: (() => executeCardAction(true)),
         endTurn: endTurn, updateHintUI: updateHintUI,
-        submitHint: submitHint, stopGame: stopGame
+        submitHint: submitHint, stopGame: stopGame, showDiscarded: showDiscarded
     }
 }();

@@ -300,6 +300,7 @@
                 $('#join-session').click(controller.joinExistingSession);
                 $('#manager-start-game').click(controller.startGame);
                 $('#manager-stop-game').click(controller.stopGame);
+                $('#discarded-cards-button').click(controller.showDiscarded).prop("disabled", true);
                 $('#discard-button').click(controller.executeDiscardAction);
                 $('#play-card-button').click(controller.executePlayAction);
                 $('#hint-submit').click(controller.submitHint);
@@ -383,6 +384,19 @@
         </header>
         <section class="modal-card-body has-text-centered">
             {% trans %}The team is out of hint tokens! Discard a card or complete a firework display to earn new ones.{% endtrans %}
+        </section>
+    </div>
+</div>
+<div class="modal" id="discarded-card-modal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">{% trans %}Discarded cards{% endtrans %}</p>
+            <button class="delete" aria-label="{% trans %}close{% endtrans %}"></button>
+        </header>
+        <section class="modal-card-body has-text-centered">
+            <p id="no-discarded-cards">{% trans %}There are no discarded cards.{% endtrans %}</p>
+            <div id="discarded-card-list"></div>
         </section>
     </div>
 </div>
@@ -581,6 +595,12 @@
                             <td><span class="cards-left">0</span>&ensp;<span class="fas fa-boxes"></span></td>
                         </tr>
                     </table>
+                    <button id="discarded-cards-button" class="button is-light" disabled>
+                        <span class="icon is-small">
+                            <span class="fas fa-layer-group is-left"></span>
+                        </span>
+                        <span>{% trans %}Discarded pile{% endtrans %}</span>
+                    </button>
                 </div>
             </div>
         </div>
