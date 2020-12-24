@@ -551,15 +551,17 @@ export const hanabiController = function () {
     }
 
     function updatePlayerHands() {
+        let act = gameState.currentAction;
+        let playerHintActive = act && act.actionType === ActionType.HINT
+                                && act.action.targetPlayer === playerContext().playerId
+
         let playerHandFmt = gameState.slotsInUse.map(
             function(status, index) {
                 if(!status.inUse) {
                     return emptySlot;
                 }
                 let act = gameState.currentAction;
-                let highlight = act && act.actionType === ActionType.HINT
-                                && act.action.targetPlayer === playerContext().playerId
-                                && act.action.positions.includes(index);
+                let highlight = playerHintActive && act.action.positions.includes(index);
                 if(highlight) {
                     return formatHintCard(/** @type {HintAction} */ act.action);
                 } else {
@@ -569,7 +571,13 @@ export const hanabiController = function () {
                 }
             }
         );
-        $('#player-hand').html(playerHandFmt);
+        const playerHand = $('#player-hand');
+        playerHand.html(playerHandFmt);
+        if(playerHintActive) {
+            playerHand.addClass('hint-active');
+        } else {
+            playerHand.removeClass('hint-active');
+        }
         $('#hanabi-other-players .hanabi-player-box').each(
             function() {
                 let theId = parseInt($(this).attr('data-player-id'));

@@ -43,7 +43,7 @@
             top: 0;
             font-size: 300%;
             z-index: 9999;
-            opacity: 0.3;
+            opacity: 0.1;
         }
 
         #loading-icon span {
@@ -133,6 +133,35 @@
             text-align: center;
         }
 
+        #player-hand {
+            border-radius: 1em;
+            background-color: #444;
+        }
+
+        #player-hand.hint-active {
+            animation: hint-animate 1s infinite alternate-reverse;
+        }
+
+        #player-hand.hint-active::before {
+            vertical-align:top;
+            position: absolute;
+            left: 3em;
+            content: "HINT";
+            font-size: 120%;
+            font-weight: bold;
+            color: #deb946;
+        }
+
+        @keyframes hint-animate {
+            from {
+                background-color: #444;
+            }
+            to {
+                background-color: #666;
+            }
+        }
+
+
         #hanabi-other-players .hanabi-card-list, .hanabi-card-list.hint-buttons  {
             font-size: 50%;
         }
@@ -163,7 +192,7 @@
             left: 0;
             bottom: 0;
             text-transform:uppercase;
-            vertical-align:top
+            vertical-align:top;
         }
 
         .table.is-centered {
