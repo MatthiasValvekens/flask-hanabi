@@ -46,6 +46,32 @@
             opacity: 0.1;
         }
 
+        #player-turn-marker {
+            position: fixed;
+            background-color: #830303;
+            color: #fff;
+            right: 0;
+            top: 0;
+            font-size: 120%;
+            text-transform: uppercase;
+            font-weight: bold;
+            z-index: 9999;
+            opacity: 0.8;
+            border-radius: 1rem;
+            padding: 1ex;
+            margin: 2rem;
+            animation: turn-marker-animate 1s infinite alternate-reverse;
+        }
+
+        @keyframes turn-marker-animate {
+            from {
+                background-color: rgba(131, 3, 3, 1);
+            }
+            to {
+                background-color: rgba(131, 3, 3, 0.5);
+            }
+        }
+
         #loading-icon span {
             padding: 0.5rem;
         }
@@ -316,6 +342,7 @@
     </script>
 </head>
 <body>
+<div id="player-turn-marker" style="display: none;">{% trans %}Your turn{% endtrans %}</div>
 <div id="loading-icon" style="display: none;"><span class="fas fa-pulse fa-spinner"></span></div>
 <div class="modal" id="play-card-modal" data-card-position="">
     <div class="modal-background"></div>
@@ -505,7 +532,6 @@
             </div>
             <hr/>
             <div class="columns">
-
                 <div class="column is-8 has-text-centered">
                     <h6 class="has-text-weight-bold has-text-centered">{% trans %}Your hand{% endtrans %}</h6>
                     <p>

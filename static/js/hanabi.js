@@ -281,11 +281,13 @@ export const hanabiController = function () {
                 $('.hanabi-player-box.active-player').removeClass('active-player');
                 if(gameState.isCurrentlyActive) {
                     statusString = HANABI_CONFIG.guiStrings.itsYourTurn;
+                    $('#player-turn-marker').show();
                     $('.only-when-active').css('visibility', 'visible');
                     $('#player-hand').addClass('clickable');
                     $('#hanabi-other-players .hanabi-player-box').addClass('clickable');
                 } else {
                     let filter = `[data-player-id="${gameState.activePlayerId}"]`;
+                    $('#player-turn-marker').hide();
                     $(`#hanabi-other-players .hanabi-player-box${filter}`).addClass("active-player");
                     $('.only-when-active').css('visibility', 'hidden');
                     $('#player-hand').removeClass('clickable');
