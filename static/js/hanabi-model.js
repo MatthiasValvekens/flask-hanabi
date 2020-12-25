@@ -18,10 +18,10 @@ export class SessionContext {
      * Boggle session context, including (optional) access to the management API.
      * @param {!int} sessionId
      * @param {!string} saltToken
-     * @param {!string} invToken
+     * @param {?string=null} invToken
      * @param {?string=null} mgmtToken
      */
-    constructor(sessionId, saltToken, invToken, mgmtToken=null) {
+    constructor(sessionId, saltToken, invToken=null, mgmtToken=null) {
         this.sessionId = sessionId;
         this.saltToken = saltToken;
         this.invToken = invToken;
@@ -33,7 +33,12 @@ export class SessionContext {
     }
 
     get joinEndpoint() {
-        return `${this.endpointBase}/join/${this.invToken}`;
+        if(this.invToken !== null) {
+            return `${this.endpointBase}/join/${this.invToken}`;
+        } else {
+            // can happen after a restore
+            throw "Invitation token not present.";
+        }
     }
 
     get isManager() {
@@ -54,24 +59,15 @@ export class PlayerContext {
      * @param {!SessionContext} sessionContext
      * @param {int} playerId
      * @param {string} playerToken
-     * @param {string} name
      */
-    constructor(sessionContext, playerId, playerToken, name) {
+    constructor(sessionContext, playerId, playerToken) {
         this.playerId = playerId;
         this.playerToken = playerToken;
-        this._name = name;
         this.sessionContext = sessionContext;
     }
 
     get playEndpoint() {
         return `${this.sessionContext.endpointBase}/play/${this.playerId}/${this.playerToken}`;
-    }
-
-    /**
-     * @returns {string}
-     */
-    get name() {
-        return this._name;
     }
 }
 

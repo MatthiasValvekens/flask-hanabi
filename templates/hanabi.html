@@ -295,6 +295,7 @@
         };
         $(document).ready(
             function() {
+                controller.setupRestoreUI();
                 $('#status-box').text(hanabi.HANABI_CONFIG.guiStrings.statusString(hanabi.GameStatus.INITIAL));
                 $('#spawn-session').click(controller.triggerSessionSpawn);
                 $('#join-session').click(controller.joinExistingSession);
@@ -510,6 +511,20 @@
                                 </span>
                             </button>
                         </div>
+                    </div>
+                    <div id="rejoin-session-widget" style="display: none;">
+                        <p>
+                            {% trans trimmed %}
+                                It seems that there's an access token for an earlier session
+                                in your browser cache. Do you want to try to rejoin that one?
+                            {% endtrans %}
+                        </p>
+                        <button class="button is-primary" id="rejoin-session-button">
+                            <span>{% trans %}Attempt to rejoin{% endtrans %}</span>
+                            <span class="icon is-small">
+                                <span class="fas fa-redo is-right"></span>
+                            </span>
+                        </button>
                     </div>
                 </div>
             </div>

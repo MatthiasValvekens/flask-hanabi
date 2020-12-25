@@ -44,6 +44,12 @@ export const HANABI_CONFIG = {
     guiStrings: /** @type {GUIStrings} */ null
 };
 
+// sessId:playerId:sessSalt:playerToken:mgmtToken:invToken
+// (the last two are optional)
+// We always take these tokens at face value.
+const restoreTokenRegex = /^(\d+):(\d+):([0-9a-f]{16}):([0-9a-f]{20})(?::([0-9a-f]{20}):([0-9a-f]{20}))?$/;
+const restoreTokenStorageKey = "hanabiSessionRestore";
+
 export function pseudoPythonInterpolate(fmt, obj) {
     // based on noice one-liner from here: https://code.djangoproject.com/ticket/4414
     // % replaced with & to avoid confusing Jinja2's gettext wrappers
@@ -134,33 +140,112 @@ export const hanabiController = function () {
         return $.getJSON(HANABI_CONFIG.apiBaseURL + endpoint, null, callback);
     }
 
+    function writeRestoreToken() {
+        const pCtxt = playerContext();
+        const sCtxt = sessionContext();
+        let restoreToken = `${sCtxt.sessionId}:${pCtxt.playerId}:${sCtxt.saltToken}:${pCtxt.playerToken}`;
+        if(sCtxt.isManager) {
+            restoreToken += `:${sCtxt.mgmtToken}:${sCtxt.invToken}`;
+        }
+        try {
+            window.localStorage.setItem(restoreTokenStorageKey, restoreToken);
+        } catch(SecurityError) {
+            console.warn("Failed to write restore token to local storage --- session restoration won't work");
+        }
+    }
+
+    function setupRestoreUI() {
+
+        let restoreToken = null;
+        try {
+            restoreToken = window.localStorage.getItem(restoreTokenStorageKey);
+        } catch(SecurityError) {}
+
+        if(!restoreToken)
+            return;
+
+        const restoreHelper = parseRestoreToken(/** @type string */ restoreToken);
+        if(!restoreHelper)
+            window.localStorage.removeItem(restoreTokenStorageKey);
+
+
+        // TODO have the server prune stale sessions, and poll here using HEAD
+        //  to check if the session is still alive.
+        //  something like restoreHelper.sessionContext.pollActive(...)
+
+        $('#rejoin-session-button').click(restoreHelper.doRestore);
+        $('#rejoin-session-widget').show();
+    }
+
+    /**
+     * @param {!string} restoreToken
+     * @return {?{sessionContext: SessionContext, doRestore: function}}
+     */
+    function parseRestoreToken(restoreToken) {
+
+        const match = restoreToken.match(restoreTokenRegex);
+        if(!match)
+            return null;
+        const sessionId = parseInt(match[1]);
+        const playerId = parseInt(match[2]);
+        const saltToken = match[3];
+        const playerToken = match[4];
+
+        let sessCtxt;
+        if(match[5]) {
+            // restore token contains mgmt token as well
+            const mgmtToken = match[5];
+            const invToken = match[6];
+
+            sessCtxt = new hanabiModel.SessionContext(
+                sessionId, saltToken, invToken, mgmtToken
+            );
+        } else {
+            sessCtxt = new hanabiModel.SessionContext(sessionId, saltToken);
+        }
+
+        return {
+            sessionContext: sessCtxt,
+            doRestore: function() {
+                _sessionContext = sessCtxt;
+                gameSetupForPlayer(playerId, playerToken);
+            }
+        }
+    }
+
+    /**
+     * @param {int} playerId
+     * @param {string} playerToken
+     */
+    function  gameSetupForPlayer(playerId, playerToken) {
+        let sess = sessionContext();
+        _playerContext = new hanabiModel.PlayerContext(
+            sess, playerId, playerToken
+        )
+
+        if(sess.isManager) {
+            $('#manager-controls').show();
+            $('#inv-token-display').val(
+                `${sess.sessionId}:${sess.saltToken}:${sess.invToken}`
+            );
+        }
+        $('#start-section').hide();
+        $('#game-section').show();
+
+        writeRestoreToken();
+        gameState = new hanabiModel.GameState(_playerContext);
+        heartbeat();
+    }
+
     /**
      * Join the session specified in the session context.
      * @param {!string} name
      */
     function requestJoin(name) {
-
-        function playerSetupCallback({player_id, player_token, name}) {
-            let sess = sessionContext();
-            _playerContext = new hanabiModel.PlayerContext(
-                sess, player_id, player_token, name
-            )
-
-            if(sess.isManager) {
-                $('#manager-controls').show();
-                $('#inv-token-display').val(
-                    `${sess.sessionId}:${sess.saltToken}:${sess.invToken}`
-                );
-            }
-            $('#start-section').hide();
-            $('#game-section').show();
-
-            gameState = new hanabiModel.GameState(_playerContext);
-            heartbeat();
-        }
         return callHanabiApi(
             'post', sessionContext().joinEndpoint,
-            {'name': name}, playerSetupCallback
+            {'name': name},
+            ({player_id, player_token}) => gameSetupForPlayer(player_id, player_token)
         );
     }
 
@@ -740,6 +825,7 @@ export const hanabiController = function () {
         executePlayAction: (() => executeCardAction(false)),
         executeDiscardAction: (() => executeCardAction(true)),
         endTurn: endTurn, updateHintUI: updateHintUI,
-        submitHint: submitHint, stopGame: stopGame, showDiscarded: showDiscarded
+        submitHint: submitHint, stopGame: stopGame,
+        showDiscarded: showDiscarded, setupRestoreUI: setupRestoreUI
     }
 }();
