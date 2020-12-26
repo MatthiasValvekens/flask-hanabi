@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2020-12-26 00:41+0100\n"
-"PO-Revision-Date: 2020-12-26 00:43+0100\n"
+"POT-Creation-Date: 2020-12-26 14:48+0100\n"
+"PO-Revision-Date: 2020-12-26 14:49+0100\n"
 "Last-Translator: \n"
 "Language: nl\n"
 "Language-Team: nl <LL@li.org>\n"
@@ -347,3 +347,11 @@ msgstr "Spel starten"
 #: templates/hanabi.html:670
 msgid "Give up"
 msgstr "Opgeven"
+
+#: templates/hanabi.html:679
+msgid "Session expired"
+msgstr "Sessie verlopen"
+
+#: templates/hanabi.html:682
+msgid "Your game session expired due to inactivity."
+msgstr "Je sessie is verlopen omdat je te lang inactief was."
