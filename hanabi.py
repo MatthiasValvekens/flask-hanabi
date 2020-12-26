@@ -74,8 +74,7 @@ def prune_stale_session():
     db.session.commit()
 
 
-app.jinja_env.auto_reload = True
-app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.jinja_env.auto_reload = app.config['TEMPLATES_AUTO_RELOAD']
 if __name__ == '__main__':
     init_db()
     app.run()

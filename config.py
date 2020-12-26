@@ -42,5 +42,8 @@ API_BASE_URL = get_env_setting('API_BASE_URL', '')
 
 try:
     SECRET_KEY = unhexlify(get_env_setting('SECRET_KEY'))
+    # if SECRET_KEY is present, assume prod mode
+    TEMPLATES_AUTO_RELOAD = False
 except EnvMissingError:
     SECRET_KEY = secrets.token_bytes(32)
+    TEMPLATES_AUTO_RELOAD = True
