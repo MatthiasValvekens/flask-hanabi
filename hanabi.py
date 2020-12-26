@@ -70,6 +70,7 @@ def prune_stale_session():
     HanabiSession.query.filter(
         HanabiSession.last_active <= now - stale_grace_period
     ).delete()
+    db.session.commit()
 
 
 app.jinja_env.auto_reload = True
