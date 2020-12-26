@@ -38,6 +38,10 @@ CARD_DIST_PER_COLOUR = [3, 2, 2, 2, 1]
 MAX_NUM_VALUE = len(CARD_DIST_PER_COLOUR)
 
 
+# adding before_first_request to init_db would cause this to be run
+#  for every worker, which isn't what we want.
+# In prod, a a CLI command seems to involve the least amount of hassle
+@app.cli.command('initdb')
 def init_db():
     """
     Set up the database schema and/or truncate all sessions.
@@ -59,10 +63,14 @@ def init_db():
             con.execute('TRUNCATE hanabi_session RESTART IDENTITY CASCADE;')
 
 
-# adding before_first_request to init_db would cause this to be run
-#  for every worker, which isn't what we want.
-# In prod, a a CLI command seems to involve the least amount of hassle
-app.cli.command('initdb')(init_db)
+@app.cli.command('prune')
+def prune_stale_session():
+    now = datetime.utcnow()
+    stale_grace_period = timedelta(minutes=app.config['SESSION_STALE_MINUTES'])
+    HanabiSession.query.filter(
+        HanabiSession.last_active <= now - stale_grace_period
+    ).delete()
+
 
 app.jinja_env.auto_reload = True
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -97,6 +105,12 @@ class HanabiSession(db.Model):
     # game settings
     cards_in_hand = db.Column(db.Integer, nullable=True)
     created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    # record the time of the last turn change
+    last_active = db.Column(
+        db.DateTime, nullable=False, default=datetime.utcnow
+    )
+
     post_action_time_limit = db.Column(
         db.Integer, nullable=False,
         default=app.config['POST_ACTION_TIME_LIMIT_SECONDS']
@@ -747,6 +761,7 @@ def end_turn(session: HanabiSession, pepper):
     session.end_turn_at = None
     session.active_player_id = next_player.id
     session.turn = HanabiSession.turn + 1
+    session.last_active = datetime.utcnow()
 
     db.session.commit()
 
@@ -962,7 +977,8 @@ def init_session(session: HanabiSession, pepper):
 
 
 # update the DB if an end-of-turn timer is triggered
-def _eot_heartbeat_tasks(session_id, pepper):
+# or if a session should be marked stale
+def _session_heartbeat_tasks(session_id, pepper):
     # NOTE: this routine runs on GET requests as well!
     # This is OK, since from the perspective of the client, the GET-request
     #  still doesn't modify any state. If you want, this routine merely brings
@@ -979,6 +995,13 @@ def _eot_heartbeat_tasks(session_id, pepper):
         return
 
     now = datetime.utcnow()
+    stale_grace_period = timedelta(minutes=app.config['SESSION_STALE_MINUTES'])
+    if now >= sess.last_active + stale_grace_period:
+        # session is stale, so prune it
+        db.session.delete(sess)
+        return
+
+    # check EOT timer
     if sess.end_turn_at is None or sess.end_turn_at >= now:
         # nothing to do
         return
@@ -997,7 +1020,7 @@ def _eot_heartbeat_tasks(session_id, pepper):
 def manage_session(session_id, pepper, mgmt_token):
     check_mgmt_token(session_id, pepper, mgmt_token)
     if request.method == 'GET':
-        _eot_heartbeat_tasks(session_id, pepper)
+        _session_heartbeat_tasks(session_id, pepper)
         return session_state(session_id)
     elif request.method == 'DELETE':
         # give up
@@ -1028,9 +1051,21 @@ def manage_session(session_id, pepper, mgmt_token):
         return jsonify({}), 200
 
 
-@app.route(session_url_base + '/join/<inv_token>', methods=['POST'])
+@app.route(session_url_base + '/join/<inv_token>', methods=['POST', 'HEAD'])
 def session_join(session_id, pepper, inv_token):
     check_inv_token(session_id, pepper, inv_token)
+    _session_heartbeat_tasks(session_id, pepper)
+
+    if request.method == 'HEAD':
+        # only report on whether the session still exists
+        exists_q = HanabiSession.query.filter(
+            HanabiSession.id == session_id
+        ).exists()
+        if db.session.query(exists_q).scalar():
+            status = 200
+        else:
+            status = 410
+        return jsonify({}), status
 
     sess: HanabiSession = HanabiSession.for_update(session_id)
 
@@ -1084,7 +1119,7 @@ def _get_int_or_none(json: dict, key):
 @app.route(play_url, methods=['GET', 'POST'])
 def play(session_id, pepper, player_id, player_token):
     check_player_token(session_id, pepper, player_id, player_token)
-    _eot_heartbeat_tasks(session_id, pepper)
+    _session_heartbeat_tasks(session_id, pepper)
 
     if request.method == 'GET':
         return session_state(session_id, player_id)

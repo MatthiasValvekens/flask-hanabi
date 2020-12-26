@@ -44,10 +44,10 @@ export const HANABI_CONFIG = {
     guiStrings: /** @type {GUIStrings} */ null
 };
 
-// sessId:playerId:sessSalt:playerToken:mgmtToken:invToken
-// (the last two are optional)
+// sessId:playerId:sessSalt:playerToken:invToken:mgmtToken
+// (the last one is optional)
 // We always take these tokens at face value.
-const restoreTokenRegex = /^(\d+):(\d+):([0-9a-f]{16}):([0-9a-f]{20})(?::([0-9a-f]{20}):([0-9a-f]{20}))?$/;
+const restoreTokenRegex = /^(\d+):(\d+):([0-9a-f]{16}):([0-9a-f]{20}):([0-9a-f]{20})(?::([0-9a-f]{20}))?$/;
 const restoreTokenStorageKey = "hanabiSessionRestore";
 
 export function pseudoPythonInterpolate(fmt, obj) {
@@ -125,7 +125,7 @@ export const hanabiController = function () {
         return $.ajax({
             url: HANABI_CONFIG.apiBaseURL + endpoint,
             type: method,
-            data: JSON.stringify(data),
+            data: data === null ? null : JSON.stringify(data),
             contentType: "application/json"
         }).done(callback).fail(errorHandler);
     }
@@ -143,9 +143,9 @@ export const hanabiController = function () {
     function writeRestoreToken() {
         const pCtxt = playerContext();
         const sCtxt = sessionContext();
-        let restoreToken = `${sCtxt.sessionId}:${pCtxt.playerId}:${sCtxt.saltToken}:${pCtxt.playerToken}`;
+        let restoreToken = `${sCtxt.sessionId}:${pCtxt.playerId}:${sCtxt.saltToken}:${pCtxt.playerToken}:${sCtxt.invToken}`;
         if(sCtxt.isManager) {
-            restoreToken += `:${sCtxt.mgmtToken}:${sCtxt.invToken}`;
+            restoreToken += `:${sCtxt.mgmtToken}`;
         }
         try {
             window.localStorage.setItem(restoreTokenStorageKey, restoreToken);
@@ -165,16 +165,30 @@ export const hanabiController = function () {
             return;
 
         const restoreHelper = parseRestoreToken(/** @type string */ restoreToken);
+
+        // can't parse token -> drop it
         if(!restoreHelper)
             window.localStorage.removeItem(restoreTokenStorageKey);
 
+        // check if the session is still relevant
 
-        // TODO have the server prune stale sessions, and poll here using HEAD
-        //  to check if the session is still alive.
-        //  something like restoreHelper.sessionContext.pollActive(...)
+        callHanabiApi(
+            'head', restoreHelper.sessionContext.joinEndpoint,
+            null, function() {
+                $('#rejoin-session-button').click(restoreHelper.doRestore);
+                $('#rejoin-session-widget').show();
+            }, function(xhr, textStatus) {
+                // 410 = session was pruned for non-activity, which
+                //  isn't really unexpected
+                if(xhr.status !== 410) {
+                    console.log(
+                        "Couldn't verify restoreToken: " + textStatus
+                    );
+                }
+                window.localStorage.removeItem(restoreTokenStorageKey);
+            }
+        );
 
-        $('#rejoin-session-button').click(restoreHelper.doRestore);
-        $('#rejoin-session-widget').show();
     }
 
     /**
@@ -190,19 +204,12 @@ export const hanabiController = function () {
         const playerId = parseInt(match[2]);
         const saltToken = match[3];
         const playerToken = match[4];
+        const invToken = match[5];
 
-        let sessCtxt;
-        if(match[5]) {
-            // restore token contains mgmt token as well
-            const mgmtToken = match[5];
-            const invToken = match[6];
-
-            sessCtxt = new hanabiModel.SessionContext(
-                sessionId, saltToken, invToken, mgmtToken
-            );
-        } else {
-            sessCtxt = new hanabiModel.SessionContext(sessionId, saltToken);
-        }
+        const mgmtToken = match[6] ? match[6] : null;
+        const sessCtxt = new hanabiModel.SessionContext(
+            sessionId, saltToken, invToken, mgmtToken
+        );
 
         return {
             sessionContext: sessCtxt,
