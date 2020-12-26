@@ -1067,7 +1067,7 @@ def session_join(session_id, pepper, inv_token):
             status = 200
         else:
             status = 410
-        return jsonify({}), status
+        return '', status
 
     sess: HanabiSession = HanabiSession.for_update(session_id)
 
