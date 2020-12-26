@@ -433,9 +433,25 @@ export const hanabiController = function () {
                     $('#manager-start-game').prop("disabled", false);
                 }
             }
-        }).always(function() {
-            // reschedule the timer, also on failures
-            heartbeatTimer = setTimeout(heartbeat, HANABI_CONFIG.heartbeatTimeout);
+        }).fail(
+            function(xhr, textStatus) {
+                if(xhr.status === 410) {
+                    $('#game-section').hide();
+                    $('#game-over').hide();
+                    $('#manager-controls').hide();
+                    $('#session-expired').show();
+                    gameState = null;
+                } else {
+                    console.warn(
+                        `Hanabi heartbeat failure (${xhr.status}): ${textStatus}`
+                    );
+                }
+            }
+        ).always(function() {
+            if(gameState !== null) {
+                // reschedule the timer, also on failures
+                heartbeatTimer = setTimeout(heartbeat, HANABI_CONFIG.heartbeatTimeout);
+            }
             toggleBusy(false);
         });
     }
