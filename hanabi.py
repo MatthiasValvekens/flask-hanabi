@@ -67,9 +67,10 @@ def init_db():
 def prune_stale_session():
     now = datetime.utcnow()
     stale_grace_period = timedelta(minutes=app.config['SESSION_STALE_MINUTES'])
-    HanabiSession.query.filter(
+    deleted = HanabiSession.query.filter(
         HanabiSession.last_active <= now - stale_grace_period
     ).delete()
+    print(f"Pruned {deleted} stale sessions.")
     db.session.commit()
 
 
