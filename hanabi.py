@@ -139,6 +139,7 @@ class HanabiSession(db.Model):
             'player.id', ondelete='cascade', use_alter=True
         ), nullable=True
     )
+    iteration = db.Column(db.Integer, nullable=False, default=0)
 
     # if the active player already performed an action, and we're waiting
     # for them to end their turn
@@ -181,7 +182,9 @@ class HanabiSession(db.Model):
         if app.config.get('TESTING', False):
             seed_suffix = app.config['TESTING_SEED']
         else:
-            seed_suffix = pepper + app.config['SECRET_KEY'].hex()
+            seed_suffix = (
+                pepper + app.config['SECRET_KEY'].hex() + str(self.iteration)
+            )
         return str(self.turn) + seed_suffix
 
     def current_action(self) -> 'ActionLog':
@@ -708,6 +711,8 @@ def stop_game(session: HanabiSession, score):
     session.end_turn_at = None
     session.need_draw = False
     session.final_score = score
+    # tweak the seed for the next round
+    session.iteration = HanabiSession.iteration + 1
     db.session.commit()
 
 
@@ -1027,7 +1032,7 @@ def manage_session(session_id, pepper, mgmt_token):
         # give up
         sess: HanabiSession = HanabiSession.for_update(session_id)
         stop_game(sess, 0)
-        return jsonify({}), 200
+        return session_state(session_id)
 
     if request.method == 'POST':
         # game initialisation logic

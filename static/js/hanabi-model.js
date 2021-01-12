@@ -262,10 +262,10 @@ export class GameState {
         this._currentFireworks = [];
 
         /** @type {boolean[]} */
-        this._oldSlotsInUse = [];
+        this._oldSlotsInUse = [false, false, false, false];
 
         /** @type {boolean[]} */
-        this._slotsInUse = [];
+        this._slotsInUse = [false, false, false, false];
         /** @type {?int} */
         this._activePlayerId = null;
 
@@ -331,12 +331,15 @@ export class GameState {
             this._score = null;
         }
         if(status !== GameStatus.INITIAL) {
-            if(this._status === GameStatus.INITIAL) {
+            if(this._status === GameStatus.GAME_OVER) {
+                this._oldSlotsInUse = [false, false, false, false];
+                this._slotsInUse = [false, false, false, false];
+            } else if (this._status === GameStatus.INITIAL) {
                 // game just started: all cards are new
                 this._oldSlotsInUse = serverUpdate.used_hand_slots
                     .map(() => false);
                 this._slotsInUse = serverUpdate.used_hand_slots;
-            } else if(gameStateAdvanced) {
+            } else if (gameStateAdvanced) {
                 this._oldSlotsInUse = this._slotsInUse;
                 this._slotsInUse = serverUpdate.used_hand_slots;
             }
